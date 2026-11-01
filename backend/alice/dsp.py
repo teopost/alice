@@ -1,5 +1,6 @@
 """Strutture audio senza dipendenze da JACK: buffer circolare, ricampionatore, ponte."""
 import threading
+import time
 
 import numpy as np
 
@@ -102,10 +103,10 @@ class Bridge:
     Thread: `exchange` gira nel loop del server WebSocket, `jack_cycle` nella
     callback di JACK; comunicano solo attraverso i due Ring.
     """
-    PRIME = 512       # campioni accumulati prima che JACK inizi a leggere
-    IN_TARGET = 768   # livello obiettivo del buffer verso JACK
+    IN_TARGET = 768   # livello obiettivo iniziale del buffer verso JACK (adattivo)
+    IN_TARGET_MAX = 9600  # 200 ms: oltre non ha senso suonare
     OUT_TARGET = 512  # livello obiettivo del buffer verso il browser
-    MAX_FILL = 4096   # oltre questa soglia si scarta l'eccesso (limita la latenza)
+    MAX_FILL = 4096   # oltre questa soglia (oltre l'obiettivo) si scarta l'eccesso
 
     def __init__(self, samplerate):
         self.sr = samplerate
@@ -124,6 +125,9 @@ class Bridge:
         self.rs_out = Resampler()
         self.pending = np.zeros(0, dtype="float32")
         self.owed = 0
+        self.in_target = self.IN_TARGET
+        self.last_underruns = 0
+        self.stable_since = time.monotonic()
         self.primed = False
         self.underruns = 0
         self.owner = owner
@@ -138,8 +142,9 @@ class Bridge:
     def exchange(self, x):
         """Riceve un blocco dal browser, restituisce il blocco da rimandare."""
         rho = self.rate / self.sr  # campioni JACK per campione del browser
+        self._adapt()
         fill = self.inp.available()
-        corr = _clamp(1 + 0.02 * (fill - self.IN_TARGET) / self.IN_TARGET, 0.98, 1.02)
+        corr = _clamp(1 + 0.02 * (fill - self.in_target) / self.in_target, 0.98, 1.02)
         self.inp.write(self.rs_in.process(x, corr / rho))
 
         y = self.out.read_all()
@@ -155,17 +160,31 @@ class Bridge:
         self.owed -= k
         return send
 
+    def _adapt(self):
+        """Buffer adattivo: si allarga dopo un'interruzione, si restringe se stabile.
+
+        Serve quando i pacchetti arrivano a raffiche (es. rete Windows <-> WSL2).
+        """
+        now = time.monotonic()
+        if self.underruns != self.last_underruns:
+            self.last_underruns = self.underruns
+            self.in_target = min(int(self.in_target * 1.5), self.IN_TARGET_MAX)
+            self.stable_since = now
+        elif now - self.stable_since > 5 and self.in_target > self.IN_TARGET:
+            self.in_target = max(self.IN_TARGET, int(self.in_target * 0.9))
+            self.stable_since = now
+
     # --- lato JACK (callback in tempo reale) --------------------------------
     def jack_cycle(self, src_out, monitor_in):
         frames = len(src_out)
         if not self.active:
             src_out.fill(0.0)
             return
-        if not self.primed and self.inp.available() >= self.PRIME:
+        if not self.primed and self.inp.available() >= self.in_target:
             self.primed = True
         if self.primed:
-            if self.inp.available() > self.MAX_FILL:
-                self.inp.skip_to(self.IN_TARGET)
+            if self.inp.available() > self.in_target + self.MAX_FILL:
+                self.inp.skip_to(self.in_target)
             n = self.inp.read_into(src_out)
             if n < frames:
                 src_out[n:] = 0.0

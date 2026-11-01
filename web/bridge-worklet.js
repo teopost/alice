@@ -9,7 +9,9 @@ class AliceBridge extends AudioWorkletProcessor {
     this.gain = 1;                // guadagno d'ingresso (lineare)
     this.sendBuf = new Float32Array(256);
     this.sendN = 0;
-    this.target = 512;            // campioni da accumulare prima di riprodurre
+    this.target = 512;            // campioni da accumulare prima di riprodurre (adattivo)
+    this.minTarget = 512;         // valore scelto nel menu Buffer: il minimo
+    this.stableQuanta = 0;
     this.ring = new Float32Array(48000 * 2);
     this.r = 0;                   // contatori assoluti
     this.w = 0;
@@ -23,7 +25,7 @@ class AliceBridge extends AudioWorkletProcessor {
       if (m instanceof Float32Array) return this.push(m);
       if (m.type === "config") {
         if (m.channel !== undefined) this.channel = m.channel;
-        if (m.target !== undefined) this.target = m.target;
+        if (m.target !== undefined) this.minTarget = this.target = m.target;
         if (m.gain !== undefined) this.gain = m.gain;
       }
     };
@@ -68,6 +70,13 @@ class AliceBridge extends AudioWorkletProcessor {
     if (this.playing && this.fill() < n) {
       this.playing = false;
       this.underruns++;
+      // buffer adattivo: dopo un'interruzione si allarga (fino a 200 ms)...
+      this.target = Math.min(Math.round(this.target * 1.5), 9600);
+      this.stableQuanta = 0;
+    } else if (++this.stableQuanta > 1875 && this.target > this.minTarget) {
+      // ...e dopo ~5 s senza interruzioni si restringe di nuovo
+      this.target = Math.max(this.minTarget, Math.round(this.target * 0.9));
+      this.stableQuanta = 0;
     }
     const left = out[0];
     if (this.playing) {
@@ -88,7 +97,7 @@ class AliceBridge extends AudioWorkletProcessor {
     if (++this.statsCounter >= 37) {
       this.statsCounter = 0;
       this.port.postMessage({ type: "stats", inPeak: this.inPeak, outPeak: this.outPeak,
-                              fill: this.fill(), underruns: this.underruns });
+                              fill: this.fill(), target: this.target, underruns: this.underruns });
       this.inPeak = 0;
       this.outPeak = 0;
     }

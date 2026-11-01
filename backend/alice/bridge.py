@@ -67,16 +67,24 @@ async def serve(js: JackSide, port: int):
         bridge.start(owner)  # una nuova connessione sostituisce la precedente
         await ws.send(json.dumps({"type": "hello", "samplerate": js.client.samplerate}))
         log.info("browser collegato")
+        last = time.monotonic()
+        max_gap = 0.0
         try:
             async for msg in ws:
                 if bridge.owner is not owner:
                     break
                 if isinstance(msg, str):
                     d = json.loads(msg)
+                    d.pop("ua", None)
                     d.update(server_underruns=bridge.underruns, jack_rate=round(bridge.rate),
-                             server_in=bridge.inp.available(), server_pending=len(bridge.pending))
+                             server_in=bridge.inp.available(), server_target=bridge.in_target,
+                             server_pending=len(bridge.pending), max_gap_ms=round(max_gap * 1000, 1))
+                    max_gap = 0.0
                     log.info("stato: %s", json.dumps(d))
                     continue
+                now = time.monotonic()
+                max_gap = max(max_gap, now - last)  # irregolarità dei pacchetti in arrivo
+                last = now
                 out = bridge.exchange(np.frombuffer(msg, dtype="<f4"))
                 if len(out):
                     await ws.send(out.astype("<f4").tobytes())

@@ -14,7 +14,8 @@ ELEMENTO è un blocco oppure un gruppo di rami in parallelo:
 Il routing è ricorsivo: lo split collega le stesse sorgenti all'inizio di ogni
 ramo, e le uscite di tutti i rami vanno al blocco successivo. JACK somma i
 segnali collegati alla stessa porta di ingresso, quindi il merge non richiede
-un plugin. Un ramo vuoto lascia passare il segnale pulito.
+un plugin. Un ramo vuoto lascia passare il segnale pulito, e un blocco spento
+viene scavalcato nei collegamenti.
 """
 import copy
 import logging
@@ -114,6 +115,10 @@ class Engine:
                 for lane in el["lanes"]:
                     merged += self._route(lane, sources, conns)
                 sources = list(dict.fromkeys(merged))
+            elif not el["enabled"]:
+                # blocco spento: scavalcato nei collegamenti. Non ci si affida al bypass
+                # dei plugin (con LSP Impulse Responses mod-host restituisce silenzio)
+                continue
             else:
                 inst = self.applied[el["id"]]["inst"]
                 model = self.models[el["model"]]
@@ -130,6 +135,15 @@ class Engine:
             for o in self.outputs:
                 conns.add((s, o))
         return conns
+
+    def _rewire(self, chain):
+        """Applica solo le differenze di collegamento rispetto allo stato attuale."""
+        new_conns = self._compute_connections(chain)
+        for c in new_conns - self.connections:
+            self.mh.connect_ports(*c)
+        for c in self.connections - new_conns:
+            self.mh.disconnect_ports(*c)
+        self.connections = new_conns
 
     # --- applicazione -----------------------------------------------------
     def file_path(self, model, name):
@@ -178,12 +192,7 @@ class Engine:
                 self.mh.remove(inst)
             for b in iter_blocks(board["chain"]):
                 self._sync_block(b)
-            new_conns = self._compute_connections(board["chain"])
-            for c in new_conns - self.connections:
-                self.mh.connect_ports(*c)
-            for c in self.connections - new_conns:
-                self.mh.disconnect_ports(*c)
-            self.connections = new_conns
+            self._rewire(board["chain"])
             self.board = board
             return copy.deepcopy(board)
 
@@ -201,6 +210,8 @@ class Engine:
             if file is not None and model.get("file"):
                 block["file"] = file or None
             self._sync_block(block)
+            if enabled is not None:
+                self._rewire(self.board["chain"])
             return copy.deepcopy(block)
 
     def snapshot(self):

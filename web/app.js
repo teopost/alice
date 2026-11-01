@@ -797,8 +797,7 @@ function showLiveStats(m) {
       inputChannels: live.stream?.getAudioTracks()[0]?.getSettings().channelCount,
       output: outSel.hidden ? "(scelta uscita non supportata dal browser)" : outSel.selectedOptions[0]?.text,
       sinkId: live.ctx?.sinkId, inPeak: +m.inPeak.toFixed(4), outPeak: +m.outPeak.toFixed(4),
-      fill: m.fill, underruns: m.underruns, baseLatency: live.ctx?.baseLatency, outputLatency: live.ctx?.outputLatency,
-      ua: navigator.userAgent,
+      fill: m.fill, target: m.target, underruns: m.underruns, baseLatency: live.ctx?.baseLatency, outputLatency: live.ctx?.outputLatency,
     }));
   }
   setVu("#vuIn", m.inPeak);
