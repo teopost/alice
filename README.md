@@ -43,6 +43,33 @@ Su Linux nativo / Raspberry Pi con scheda audio reale (imposta `ALICE_ALSA_DEVIC
 docker compose -f docker-compose.yml -f docker-compose.hw.yml up -d
 ```
 
+## Installazione su Linux con scheda audio (es. HX Stomp)
+
+È l'uso previsto: la scheda audio è collegata al computer che fa girare Alice e il
+browser serve solo da controllo (anche da tablet o telefono). Ritardo di pochi millisecondi.
+
+1. **Prerequisiti**: Docker con il plugin compose; utente nel gruppo `audio`
+   (`sudo usermod -aG audio $USER`, poi rientra). Per il tempo reale conviene il governor
+   della CPU su `performance` e, se disponibile, un kernel `lowlatency` o `PREEMPT_RT`.
+2. **Trova la scheda audio**:
+   ```sh
+   aplay -l          # es. "card 1: Stomp [HX Stomp], device 0"
+   ```
+   e imposta `ALICE_ALSA_DEVICE` in `docker-compose.hw.yml` (es. `hw:Stomp` o `hw:1`).
+3. **Canali**: la catena prende l'audio da `ALICE_INPUTS` (default `system:capture_1`) e lo
+   manda a `ALICE_OUTPUTS` (default `system:playback_1,system:playback_2`). Con una scheda a più
+   canali, come la HX Stomp, imposta il canale a cui arriva la chitarra, es.
+   `ALICE_INPUTS: system:capture_1`. Per vedere le porte: `docker exec alice jack_lsp`.
+4. **Avvio**:
+   ```sh
+   docker compose -f docker-compose.yml -f docker-compose.hw.yml up -d --build
+   docker logs -f alice      # deve comparire "avvio jackd (alsa, ...)" e "Alice pronta"
+   ```
+5. Apri `http://<ip-del-pc>:8090`. Se senti crepitii (xrun nella barra in alto), alza
+   `ALICE_BUFFER_SIZE` a 256.
+
+Con la HX Stomp conviene un preset vuoto, così ad Alice arriva la chitarra pulita.
+
 ## Architettura
 
 Un solo container con:
