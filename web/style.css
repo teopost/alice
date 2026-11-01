@@ -291,3 +291,12 @@ main { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: 
   .engine-info { display: none; }
   .param { width: 80px; }
 }
+
+/* ---------- ponte audio dal vivo ---------- */
+.testbar.live { border-top: 1px solid #1c1e21; }
+.testbar.live select { max-width: 220px; }
+#liveBtn.active { background: var(--ok); border-color: var(--ok); color: #08130c; }
+.vu { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; color: var(--muted); }
+.vu-bar { width: 70px; height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
+.vu-bar > div { height: 100%; width: 0; background: var(--ok); transition: width 0.08s; }
+.vu-bar > div.clip { background: var(--accent); }

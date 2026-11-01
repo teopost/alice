@@ -636,10 +636,164 @@ function setupTestbar() {
   };
 }
 
+// ---------------------------------------------------------------- ponte audio dal vivo
+// Il browser cattura la chitarra dalla scheda audio del PC e la manda al motore
+// via WebSocket; il suono elaborato torna indietro e viene riprodotto.
+const LS = (k, v) => {
+  try {
+    if (v === undefined) return localStorage.getItem("alice." + k);
+    localStorage.setItem("alice." + k, v);
+  } catch { return null; }
+};
+
+const live = { ctx: null, stream: null, node: null, ws: null, sr: 48000, stats: null };
+
+async function listDevices() {
+  const devs = await navigator.mediaDevices.enumerateDevices();
+  const fill = (sel, kind, first) => {
+    const cur = sel.value || LS(sel.id) || "";
+    sel.innerHTML = "";
+    sel.add(new Option(first, ""));
+    devs.filter((d) => d.kind === kind && d.deviceId && !["default", "communications"].includes(d.deviceId))
+      .forEach((d, i) => sel.add(new Option(d.label || `${kind} ${i + 1}`, d.deviceId, false, d.deviceId === cur)));
+  };
+  fill($("#liveInput"), "audioinput", "Ingresso predefinito");
+  fill($("#liveOutput"), "audiooutput", "Uscita predefinita");
+}
+
+function setupLive() {
+  const canSink = typeof AudioContext !== "undefined" && "setSinkId" in AudioContext.prototype;
+  if (!canSink) $("#liveOutput").hidden = true;
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    $("#liveBtn").disabled = true;
+    $("#liveInfo").textContent = "Il browser permette l'ingresso audio solo da http://localhost o in https.";
+    return;
+  }
+  for (const id of ["liveInput", "liveOutput", "liveChannel", "liveBuffer"]) {
+    const saved = LS(id);  // ingresso e uscita vengono ripristinati da listDevices()
+    if (saved !== null && (id === "liveChannel" || id === "liveBuffer")) $("#" + id).value = saved;
+    $("#" + id).addEventListener("change", (e) => {
+      LS(id, e.target.value);
+      if (id === "liveChannel" || id === "liveBuffer") {
+        live.node?.port.postMessage({ type: "config", channel: Number($("#liveChannel").value),
+                                      target: Number($("#liveBuffer").value) });
+      } else if (live.ctx) {
+        stopLive().then(startLive);   // cambio di dispositivo: riavvia
+      }
+    });
+  }
+  // le etichette dei dispositivi sono visibili solo dopo il permesso del microfono
+  listDevices().catch(() => {});
+  navigator.mediaDevices.addEventListener?.("devicechange", () => listDevices().catch(() => {}));
+  $("#liveBtn").onclick = () => (live.ctx ? stopLive() : startLive());
+}
+
+async function startLive() {
+  const btn = $("#liveBtn");
+  btn.disabled = true;
+  try {
+    const inputId = $("#liveInput").value;
+    live.stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        deviceId: inputId ? { exact: inputId } : undefined,
+        echoCancellation: false, noiseSuppression: false, autoGainControl: false,
+        channelCount: { ideal: 2 }, latency: 0,
+      },
+    });
+    await listDevices();
+    const ctx = new AudioContext({ sampleRate: live.sr, latencyHint: 0 });
+    live.ctx = ctx;
+    const outId = $("#liveOutput").value;
+    if (outId && ctx.setSinkId) await ctx.setSinkId(outId);
+    await ctx.audioWorklet.addModule("bridge-worklet.js");
+    const node = new AudioWorkletNode(ctx, "alice-bridge", {
+      numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2],
+      channelCount: 2, channelCountMode: "explicit", channelInterpretation: "discrete",
+    });
+    live.node = node;
+    node.port.postMessage({ type: "config", channel: Number($("#liveChannel").value),
+                            target: Number($("#liveBuffer").value) });
+    ctx.createMediaStreamSource(live.stream).connect(node);
+    node.connect(ctx.destination);
+
+    const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/audio`);
+    ws.binaryType = "arraybuffer";
+    live.ws = ws;
+    ws.onmessage = (e) => {
+      if (typeof e.data === "string") return;
+      const data = new Float32Array(e.data);
+      node.port.postMessage(data, [data.buffer]);
+    };
+    ws.onclose = () => {
+      if (live.ws === ws) {
+        stopLive();
+        toast("Ponte audio interrotto", true);
+      }
+    };
+    node.port.onmessage = (e) => {
+      const m = e.data;
+      if (m instanceof Float32Array) {
+        if (ws.readyState === WebSocket.OPEN) ws.send(m.buffer);
+      } else if (m.type === "stats") {
+        showLiveStats(m);
+      }
+    };
+    await ctx.resume();
+    btn.textContent = "■ Ferma";
+    btn.classList.add("active");
+    const track = live.stream.getAudioTracks()[0];
+    const settings = track.getSettings();
+    if ((settings.channelCount || 1) < 2) $("#liveChannel").value = "0";
+    toast(`In ascolto da: ${track.label || "ingresso predefinito"}`);
+  } catch (e) {
+    await stopLive();
+    toast(e.name === "NotAllowedError" ? "Permesso per l'ingresso audio negato" : `Ponte audio: ${e.message}`, true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function stopLive() {
+  const { ws, stream, ctx } = live;
+  live.ws = live.node = live.ctx = live.stream = null;
+  ws?.close();
+  stream?.getTracks().forEach((t) => t.stop());
+  await ctx?.close().catch(() => {});
+  const btn = $("#liveBtn");
+  btn.textContent = "● Attiva";
+  btn.classList.remove("active");
+  $("#liveInfo").textContent = "";
+  setVu("#vuIn", 0);
+  setVu("#vuOut", 0);
+}
+
+function setVu(sel, peak) {
+  const el = $(sel);
+  const db = peak > 0 ? 20 * Math.log10(peak) : -60;
+  el.style.width = `${Math.max(0, Math.min(100, ((db + 60) / 60) * 100))}%`;
+  el.classList.toggle("clip", peak >= 0.99);
+}
+
+function showLiveStats(m) {
+  setVu("#vuIn", m.inPeak);
+  setVu("#vuOut", m.outPeak);
+  const ctx = live.ctx;
+  if (!ctx) return;
+  // stima: buffer di uscita del browser + buffer anti-scatti + cattura e motore (~2 quanti + 2 cicli JACK)
+  const sec = (ctx.baseLatency || 0) + (ctx.outputLatency || 0) + m.fill / ctx.sampleRate + 0.02;
+  $("#liveInfo").textContent = `ritardo ≈ ${Math.round(sec * 1000)} ms` + (m.underruns ? ` · scatti ${m.underruns}` : "");
+}
+
 // ---------------------------------------------------------------- WebSocket
 function connectWs() {
   const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
-  ws.onopen = () => $("#conn").classList.add("ok");
+  ws.onopen = () => {
+    $("#conn").classList.add("ok");
+    // dopo una riconnessione (es. riavvio del motore) lo stato locale può essere vecchio:
+    // lo si ricarica, altrimenti la prima modifica rimanderebbe al server una pedaliera superata
+    if (connectWs.connectedOnce) refreshState().catch(() => {});
+    connectWs.connectedOnce = true;
+  };
   ws.onclose = () => {
     $("#conn").classList.remove("ok");
     setTimeout(connectWs, 1500);
@@ -662,6 +816,7 @@ function connectWs() {
 }
 
 function showStatus(s) {
+  live.sr = s.samplerate;
   const dsp = Math.min(100, s.dsp);
   const fill = $("#dspFill");
   fill.style.width = `${dsp}%`;
@@ -669,6 +824,13 @@ function showStatus(s) {
   $("#dspValue").textContent = `${dsp.toFixed(0)}%`;
   const ms = ((s.buffer / s.samplerate) * 1000).toFixed(1);
   $("#engineInfo").textContent = `${s.samplerate / 1000} kHz · ${s.buffer} (${ms} ms) · xrun ${s.xruns}`;
+}
+
+async function refreshState() {
+  await Promise.all(["nam", "ir", "di"].map(loadFiles));
+  S.board = await api("GET", "/api/board");
+  await loadPresets();
+  render();
 }
 
 // ---------------------------------------------------------------- tastiera
@@ -696,6 +858,7 @@ async function init() {
   await loadPresets();
   setupPresets();
   setupTestbar();
+  setupLive();
   render();
   connectWs();
 }

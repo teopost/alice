@@ -16,7 +16,14 @@ docker compose up -d --build
 
 Poi apri **http://localhost:8090** (da un altro dispositivo: `http://<ip-del-computer>:8090`).
 
-Per sentire il suono senza scheda audio: carica un file DI (chitarra registrata pulita, `.wav`)
+**Suonare con la chitarra dal PC (ponte audio)**: nella barra "Suona dal vivo" scegli l'ingresso
+della scheda audio (es. HX Stomp) e il canale della chitarra, poi premi **Attiva** e consenti
+l'accesso al microfono. Il browser cattura la chitarra, la invia al motore via WebSocket e
+riproduce il suono elaborato. Ritardo tipico 40–80 ms: va bene per provare i suoni, non per
+suonare dal vivo. Il browser concede l'ingresso audio solo da `http://localhost` o in https.
+Su Linux nativo / Raspberry Pi la scheda audio si collega direttamente al motore (pochi ms).
+
+In alternativa, senza chitarra: carica un file DI (chitarra registrata pulita, `.wav`)
 nella barra in basso e premi **Ascolta**: il backend lo fa passare nella catena e il browser
 riproduce il risultato. I profili NAM si caricano dal blocco Amp (gratuiti su
 [TONE3000](https://www.tone3000.com)), gli IR dal blocco IR Cab.
@@ -64,6 +71,7 @@ effetto basta indicare l'URI LV2 e i parametri da mostrare.
 | GET, PUT, DELETE | `/api/presets[/{nome}]` | preset; POST `/api/presets/{nome}/load` per richiamarlo |
 | POST | `/api/render?di=nome.wav` | fa passare un DI nella catena, restituisce il WAV |
 | WS | `/ws` | stato (DSP, xrun) e modifiche fatte da altri dispositivi |
+| WS | `/ws/audio` | ponte audio: blocchi float32 mono a 48 kHz in entrambe le direzioni |
 
 `scripts/alice_poc.py` (prova di fattibilità) parla direttamente con mod-host: mod-host accetta un
 solo client, quindi funziona solo con il backend fermo.

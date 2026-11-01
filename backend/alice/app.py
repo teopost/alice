@@ -10,13 +10,14 @@ import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import numpy as np
 import soundfile as sf
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from .audio import MONITOR, TEST_SRC, Audio
+from .audio import BRIDGE_SRC, MONITOR, TEST_SRC, Audio
 from .catalog import FILE_KINDS, load_catalog
 from .engine import BoardError, Engine
 from .modhost import ModHost, ModHostError
@@ -63,7 +64,6 @@ def default_board():
     return {"name": "Alice", "chain": [
         {"id": "gate1", "kind": "block", "model": "gate"},
         {"id": "drive1", "kind": "block", "model": "ts9", "enabled": False},
-        {"id": "amp1", "kind": "block", "model": "nam", "file": first("nam")},
         {"id": "cab1", "kind": "block", "model": "ir", "file": first("ir")},
         {"id": "rev1", "kind": "block", "model": "room"},
     ]}
@@ -104,6 +104,8 @@ async def status_loop():
         await asyncio.sleep(0.5)
         if hub.clients:
             await hub.send({"type": "status", "dsp": round(audio.cpu_load(), 1), "xruns": audio.xruns,
+                            "bridge": audio.bridge.active, "bridge_underruns": audio.bridge.underruns,
+                            "jack_rate": round(audio.rate),
                             "samplerate": audio.samplerate, "buffer": audio.blocksize})
 
 
@@ -116,7 +118,7 @@ async def lifespan(app):
                  feedback_port=int(os.environ.get("MOD_HOST_FEEDBACK_PORT", 5556)))
     await run_in_threadpool(mh.connect)
     audio = Audio()
-    engine = Engine(mh, catalog, DATA, INPUTS + [TEST_SRC], OUTPUTS + [MONITOR])
+    engine = Engine(mh, catalog, DATA, INPUTS + [TEST_SRC, BRIDGE_SRC], OUTPUTS + [MONITOR])
     engine.file_kinds = FILE_KINDS
     await run_in_threadpool(engine.reset)
     board = None
@@ -286,6 +288,32 @@ async def render(di: str):
 
 
 # --- WebSocket ----------------------------------------------------------------
+@app.websocket("/ws/audio")
+async def ws_audio(ws: WebSocket):
+    """Ponte audio: riceve blocchi float32 mono dal browser, restituisce l'uscita della catena.
+
+    Un solo ponte alla volta: una nuova connessione sostituisce la precedente.
+    """
+    await ws.accept()
+    audio: Audio = state["audio"]
+    bridge = audio.bridge
+    owner = object()
+    bridge.start(owner)
+    await ws.send_json({"type": "hello", "samplerate": audio.samplerate})
+    log.info("ponte audio: browser collegato")
+    try:
+        while bridge.owner is owner:
+            data = await ws.receive_bytes()
+            out = bridge.exchange(np.frombuffer(data, dtype="<f4"))
+            if len(out):
+                await ws.send_bytes(out.astype("<f4").tobytes())
+    except WebSocketDisconnect:
+        pass
+    finally:
+        bridge.stop(owner)
+        log.info("ponte audio: browser scollegato")
+
+
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
     await ws.accept()

@@ -6,7 +6,10 @@ set -eu
 
 case "$ALICE_AUDIO_DRIVER" in
   dummy)
-    set -- -d dummy -r "$ALICE_SAMPLE_RATE" -p "$ALICE_BUFFER_SIZE" -C 2 -P 2
+    # -w: microsecondi tra un ciclo e l'altro; senza, il timer del driver dummy
+    # gira più veloce del tempo reale (misurato +9% con buffer 128)
+    WAIT_US=$(( ALICE_BUFFER_SIZE * 1000000 / ALICE_SAMPLE_RATE ))
+    set -- -d dummy -r "$ALICE_SAMPLE_RATE" -p "$ALICE_BUFFER_SIZE" -w "$WAIT_US" -C 2 -P 2
     ;;
   alsa)
     set -- -R -d alsa -d "$ALICE_ALSA_DEVICE" -r "$ALICE_SAMPLE_RATE" \

@@ -36,8 +36,28 @@
 
   <section id="editor" class="editor"></section>
 
+  <section class="testbar live">
+    <span class="testbar-label">Suona dal vivo</span>
+    <select id="liveInput" title="Ingresso (es. la scheda audio della HX Stomp)"><option value="">Ingresso…</option></select>
+    <select id="liveChannel" title="Canale dell'ingresso a cui è collegata la chitarra">
+      <option value="0">Canale 1 (L)</option>
+      <option value="1">Canale 2 (R)</option>
+    </select>
+    <select id="liveOutput" title="Uscita audio"><option value="">Uscita predefinita</option></select>
+    <select id="liveBuffer" title="Buffer anti-scatti: più basso = meno ritardo, più alto = meno crepitii">
+      <option value="256">Buffer 256</option>
+      <option value="512" selected>Buffer 512</option>
+      <option value="1024">Buffer 1024</option>
+      <option value="2048">Buffer 2048</option>
+    </select>
+    <button id="liveBtn" class="btn primary">● Attiva</button>
+    <div class="vu" title="Livello ingresso"><span>IN</span><div class="vu-bar"><div id="vuIn"></div></div></div>
+    <div class="vu" title="Livello uscita"><span>OUT</span><div class="vu-bar"><div id="vuOut"></div></div></div>
+    <span id="liveInfo" class="hint"></span>
+  </section>
+
   <section class="testbar">
-    <span class="testbar-label">Prova suono</span>
+    <span class="testbar-label">Prova con file</span>
     <select id="diSelect" title="File DI (chitarra registrata senza effetti)"></select>
     <label class="btn ghost">Carica DI<input id="diUpload" type="file" accept=".wav,audio/wav" hidden></label>
     <button id="renderBtn" class="btn primary">▶ Ascolta</button>
