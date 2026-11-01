@@ -2,7 +2,11 @@
 
 Formato della pedaliera (JSON):
 
-    {"name": "Clean", "chain": [ELEMENTO, ...]}
+    {"name": "Clean", "chain": [ELEMENTO, ...], "chain2": [ELEMENTO, ...]}
+
+"chain2" (facoltativa) è la seconda riga della griglia, come il secondo percorso
+dell'Helix collegato in coda al primo: per l'audio la catena è chain seguita da chain2.
+"rows" (1 o 2) dice se l'utente ha attivato la seconda riga.
 
 ELEMENTO è un blocco oppure un gruppo di rami in parallelo:
 
@@ -10,6 +14,9 @@ ELEMENTO è un blocco oppure un gruppo di rami in parallelo:
      "params": {"fslider2_": 0.6}, "file": null}
 
     {"id": "s1", "kind": "split", "lanes": [[ELEMENTO, ...], [ELEMENTO, ...]]}
+
+"gap" (facoltativo) è il numero di caselle vuote della griglia prima dell'elemento:
+serve solo all'interfaccia per lasciare i blocchi dove li si mette, l'audio lo ignora.
 
 Il routing è ricorsivo: lo split collega le stesse sorgenti all'inizio di ogni
 ramo, e le uscite di tutti i rami vanno al blocco successivo. JACK somma i
@@ -40,6 +47,11 @@ def iter_blocks(chain):
             yield el
 
 
+def full_chain(board):
+    """Le due righe della pedaliera, una dopo l'altra: è la catena del segnale."""
+    return board["chain"] + board.get("chain2", [])
+
+
 def find_block(chain, block_id):
     for b in iter_blocks(chain):
         if b["id"] == block_id:
@@ -56,7 +68,7 @@ class Engine:
         self.inputs = list(inputs)
         self.outputs = list(outputs)
         self.lock = threading.RLock()
-        self.board = {"name": "Nuovo preset", "chain": []}
+        self.board = {"name": "Nuovo preset", "chain": [], "chain2": []}
         self.applied = {}        # block_id -> {"inst", "model", "params", "enabled", "file"}
         self.connections = set()  # (src, dst)
         self._next_inst = 0
@@ -81,8 +93,12 @@ class Engine:
                     lanes = el.get("lanes")
                     if not isinstance(lanes, list) or len(lanes) < 2:
                         raise BoardError("uno split deve avere almeno due rami")
-                    out.append({"id": el["id"], "kind": "split",
-                                "lanes": [norm_chain(l, depth + 1) for l in lanes]})
+                    split = {"id": el["id"], "kind": "split", "gap": self._gap(el),
+                                "lanes": [norm_chain(l, depth + 1) for l in lanes]}
+                    # "span": colonna del nodo di fine scelta dall'utente (solo grafica)
+                    if isinstance(el.get("span"), int) and 0 <= el["span"] <= 64:
+                        split["span"] = el["span"]
+                    out.append(split)
                     continue
                 model = self.models.get(el.get("model"))
                 if model is None:
@@ -91,12 +107,26 @@ class Engine:
                 for k, v in (el.get("params") or {}).items():
                     if k in params:
                         params[k] = self._clamp(model, k, v)
-                out.append({"id": el["id"], "kind": "block", "model": model["id"],
+                out.append({"id": el["id"], "kind": "block", "model": model["id"], "gap": self._gap(el),
                             "enabled": bool(el.get("enabled", True)), "params": params,
                             "file": el.get("file") if model.get("file") else None})
             return out
 
-        return {"name": str(board.get("name") or "Senza nome"), "chain": norm_chain(board["chain"], 0)}
+        chain2 = board.get("chain2") or []
+        if not isinstance(chain2, list):
+            raise BoardError("'chain2' deve essere una lista")
+        chain2 = norm_chain(chain2, 0)
+        # la seconda riga è una scelta dell'utente: resta attiva se richiesta o se contiene blocchi
+        rows = 2 if chain2 or board.get("rows") == 2 else 1
+        return {"name": str(board.get("name") or "Senza nome"), "rows": rows,
+                "chain": norm_chain(board["chain"], 0), "chain2": chain2}
+
+    @staticmethod
+    def _gap(el):
+        try:
+            return max(0, min(64, int(el.get("gap") or 0)))
+        except (TypeError, ValueError):
+            return 0
 
     def _clamp(self, model, symbol, value):
         p = next(p for p in model["params"] if p["symbol"] == symbol)
@@ -183,22 +213,22 @@ class Engine:
     def apply(self, board):
         board = self.normalize(board)
         with self.lock:
-            wanted = {b["id"] for b in iter_blocks(board["chain"])}
+            wanted = {b["id"] for b in iter_blocks(full_chain(board))}
             # prima stacca i blocchi rimossi, poi rimuovi le istanze
             for bid in [b for b in self.applied if b not in wanted]:
                 inst = self.applied.pop(bid)["inst"]
                 self.connections = {c for c in self.connections
                                     if not (c[0].startswith(f"effect_{inst}:") or c[1].startswith(f"effect_{inst}:"))}
                 self.mh.remove(inst)
-            for b in iter_blocks(board["chain"]):
+            for b in iter_blocks(full_chain(board)):
                 self._sync_block(b)
-            self._rewire(board["chain"])
+            self._rewire(full_chain(board))
             self.board = board
             return copy.deepcopy(board)
 
     def update_block(self, block_id, params=None, enabled=None, file=None):
         with self.lock:
-            block = find_block(self.board["chain"], block_id)
+            block = find_block(full_chain(self.board), block_id)
             if block is None:
                 raise BoardError(f"blocco inesistente: {block_id}")
             model = self.models[block["model"]]
@@ -211,7 +241,7 @@ class Engine:
                 block["file"] = file or None
             self._sync_block(block)
             if enabled is not None:
-                self._rewire(self.board["chain"])
+                self._rewire(full_chain(self.board))
             return copy.deepcopy(block)
 
     def snapshot(self):

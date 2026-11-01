@@ -7,12 +7,13 @@ import os
 import re
 import subprocess
 import tempfile
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import soundfile as sf
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
@@ -22,6 +23,7 @@ from .bridge import SRC as BRIDGE_SRC
 from .catalog import FILE_KINDS, load_catalog
 from .engine import BoardError, Engine
 from .modhost import ModHost, ModHostError
+from .tone3000 import T3KError, Tone3000
 
 logging.basicConfig(level=os.environ.get("ALICE_LOG_LEVEL", "INFO"),
                     format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -34,6 +36,8 @@ OUTPUTS = [p for p in os.environ.get("ALICE_OUTPUTS", "system:playback_1,system:
 STATE_FILE = DATA / "state" / "current.json"
 PRESETS = DATA / "presets"
 SAFE_NAME = re.compile(r"^[\w\-. ()&+]{1,100}$")
+T3K_LIBRARY = DATA / "state" / "tone3000-library.json"   # file installati da TONE3000
+t3k = Tone3000(DATA / "state" / "tone3000.json", os.environ.get("ALICE_T3K_KEY"))
 
 
 class Hub:
@@ -145,6 +149,11 @@ app = FastAPI(title="Alice", lifespan=lifespan)
 @app.exception_handler(BoardError)
 async def board_error(request, exc):
     return JSONResponse({"detail": str(exc)}, status_code=400)
+
+
+@app.exception_handler(T3KError)
+async def t3k_error(request, exc):
+    return JSONResponse({"detail": str(exc)}, status_code=exc.status if 400 <= exc.status < 600 else 500)
 
 
 @app.exception_handler(ModHostError)
@@ -268,6 +277,158 @@ def delete_preset(name: str):
         raise HTTPException(404, "preset inesistente")
     p.unlink()
     return {"ok": True}
+
+
+# --- TONE3000 -------------------------------------------------------------------
+def t3k_library():
+    try:
+        return json.loads(T3K_LIBRARY.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def safe_filename(text, ext):
+    """Nome di file accettato da check_name, ricavato da titolo e nome del modello."""
+    name = re.sub(r"[^\w\-. ()&+]+", " ", text, flags=re.UNICODE)
+    name = re.sub(r"\s+", " ", name).strip(" .-")[: 100 - len(ext)] or "modello"
+    return name + ext
+
+
+@app.get("/api/t3k/status")
+def t3k_status():
+    return t3k.status()
+
+
+@app.put("/api/t3k/key")
+async def t3k_set_key(request: Request):
+    t3k.set_client_id((await request.json()).get("key", ""))
+    return t3k.status()
+
+
+@app.post("/api/t3k/authorize")
+async def t3k_authorize(request: Request):
+    """URL di accesso a TONE3000. Il ritorno arriva a /t3k/callback sullo stesso indirizzo
+    da cui è aperta l'interfaccia (localhost è sempre accettato da TONE3000; un indirizzo
+    di rete va registrato sulla chiave)."""
+    body = await request.json()
+    origin = str(body.get("origin") or "").rstrip("/")
+    if not re.match(r"^https?://[\w.\-\[\]:]+$", origin):
+        raise HTTPException(400, "origine non valida")
+    extra = {}
+    if body.get("prompt") == "select_tone":
+        extra = {"gears": body.get("gears") or "amp_amp-cab_pedal_outboard_cab", "format": "nam", "preview": "true"}
+        if body.get("format") == "ir":
+            extra = {"format": "ir", "preview": "true"}
+    url = await run_in_threadpool(t3k.authorize_url, origin + "/t3k/callback", body.get("prompt"), extra)
+    return {"url": url}
+
+
+CALLBACK_PAGE = """<!doctype html><html lang="it"><meta charset="utf-8"><title>TONE3000 · Alice</title>
+<style>body{background:#0b0c0e;color:#eceef1;font:15px system-ui,sans-serif;display:grid;place-items:center;height:100vh;margin:0}
+div{text-align:center;max-width:420px;padding:20px}a{color:#7cf0b6}</style>
+<div><h2>%s</h2><p>%s</p><p><a href="/">Torna ad Alice</a></p></div>
+<script>
+const msg = %s;
+try { new BroadcastChannel("alice_t3k").postMessage(msg); } catch (e) {}
+if (window.opener) { try { window.opener.postMessage(msg, location.origin); } catch (e) {} setTimeout(() => window.close(), 400); }
+else { setTimeout(() => location.replace("/#store"), 1200); }
+</script></html>"""
+
+
+@app.get("/t3k/callback", response_class=HTMLResponse)
+async def t3k_callback(state: str = "", code: str = "", error: str = "", tone_id: str = "", canceled: str = ""):
+    import html
+    msg = {"type": "alice_t3k", "ok": False, "tone_id": tone_id or None}
+    try:
+        if error and not code:
+            raise T3KError(f"TONE3000 ha restituito un errore: {error}", 400)
+        await run_in_threadpool(t3k.complete, state, code)
+        msg["ok"] = True
+        msg["canceled"] = canceled == "true"
+        title, text = "Account collegato", "Puoi chiudere questa finestra e tornare ad Alice."
+    except T3KError as e:
+        msg["error"] = str(e)
+        title, text = "Accesso non riuscito", html.escape(str(e))
+    return CALLBACK_PAGE % (title, text, json.dumps(msg))
+
+
+@app.post("/api/t3k/logout")
+def t3k_logout():
+    t3k.logout()
+    return t3k.status()
+
+
+@app.get("/api/t3k/feed/{kind}")
+async def t3k_feed(kind: str, gear: str = "", page: int = 1, query: str = ""):
+    return await run_in_threadpool(t3k.feed, kind, gear or None, page, query or None)
+
+
+@app.get("/api/t3k/tones/{tone_id}")
+async def t3k_tone(tone_id: int):
+    res = await run_in_threadpool(t3k.tone, tone_id)
+    lib = t3k_library()
+    installed = {v["model_id"]: k for k, v in lib.items()}
+    for m in res["models"]:
+        m["installed"] = installed.get(m["id"])
+    return res
+
+
+@app.post("/api/t3k/install")
+async def t3k_install(request: Request):
+    """Scarica un modello di TONE3000 tra i file di Alice (NAM in models/, IR in irs/)."""
+    body = await request.json()
+    tone_id, model_id = int(body["tone_id"]), int(body["model_id"])
+    tone = await run_in_threadpool(t3k.get, f"/api/v1/tones/{tone_id}")
+    model = await run_in_threadpool(t3k.get, f"/api/v1/models/{model_id}")
+    if model.get("tone_id") != tone_id:
+        raise HTTPException(400, "il modello non appartiene a questo tone")
+    is_ir = tone.get("format") == "ir"
+    if tone.get("format") not in ("nam", "ir"):
+        raise HTTPException(400, f"formato non supportato da Alice: {tone.get('format')}")
+    kind = "ir" if is_ir else "nam"
+    title = tone.get("title") or f"tone {tone_id}"
+    mname = model.get("name") or str(model_id)
+    label = title if mname.lower() in title.lower() else f"{title} - {mname}"
+    name = safe_filename(label, ".wav" if is_ir else ".nam")
+    d = kind_dir(kind)
+    if (d / name).exists() and t3k_library().get(name, {}).get("model_id") != model_id:
+        name = safe_filename(f"{label} {model_id}", ".wav" if is_ir else ".nam")
+    data = await run_in_threadpool(t3k.download, model["model_url"])
+    if is_ir:
+        sr = state["audio"].samplerate
+        with tempfile.NamedTemporaryFile(suffix=".wav") as tmp:
+            tmp.write(data)
+            tmp.flush()
+            r = subprocess.run(["sox", tmp.name, "-c", "1", "-r", str(sr), "-b", "24", str(d / name)],
+                               capture_output=True, text=True)
+        if r.returncode != 0:
+            raise HTTPException(400, f"IR non valida: {r.stderr.strip()}")
+    else:
+        try:
+            nam = json.loads(data)
+            assert "architecture" in nam and "weights" in nam
+        except Exception:
+            raise HTTPException(400, "il file scaricato non è un modello NAM valido")
+        (d / name).write_bytes(data)
+    lib = t3k_library()
+    user = tone.get("user") or {}
+    lib[name] = {"kind": kind, "tone_id": tone_id, "model_id": model_id, "title": title, "model": mname,
+                 "creator": user.get("display_name") or user.get("username"), "url": tone.get("url"),
+                 "image": (tone.get("images") or [None])[0], "gear": tone.get("gear"),
+                 "license": tone.get("license"), "size": model.get("size"),
+                 "architecture": model.get("architecture_version"), "installed_at": time.time()}
+    T3K_LIBRARY.parent.mkdir(parents=True, exist_ok=True)
+    T3K_LIBRARY.write_text(json.dumps(lib, indent=2))
+    log.info("TONE3000: installato %s (%s)", name, kind)
+    return {"name": name, "kind": kind}
+
+
+@app.get("/api/t3k/library")
+def t3k_library_list():
+    """File installati da TONE3000 ancora presenti su disco."""
+    lib = t3k_library()
+    return [dict(v, name=k) for k, v in lib.items()
+            if (kind_dir(v["kind"]) / k).is_file()]
 
 
 # --- render di prova ----------------------------------------------------------

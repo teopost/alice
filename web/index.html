@@ -3,21 +3,38 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#111214">
+<meta name="theme-color" content="#0b0c0e">
 <title>Alice</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23e04040'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3Ea%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header class="topbar">
-  <div class="brand">alice</div>
+  <div class="brand"><span class="brand-mark">a</span><span class="brand-name">alice</span></div>
+  <nav class="views" aria-label="Sezioni">
+    <button data-view="board" class="active">Pedaliera</button>
+    <button data-view="store">Profili NAM</button>
+  </nav>
+
   <div class="preset">
-    <select id="presetSelect" title="Preset salvati"></select>
-    <input id="presetName" type="text" spellcheck="false" title="Nome del preset">
-    <button id="savePreset" class="btn">Salva</button>
-    <button id="newPreset" class="btn ghost" title="Nuovo preset vuoto">Nuovo</button>
-    <button id="deletePreset" class="btn ghost danger" title="Elimina il preset selezionato">Elimina</button>
+    <button id="prevPreset" class="icon-btn" title="Preset precedente" aria-label="Preset precedente">
+      <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="preset-display">
+      <span class="preset-label">PRESET</span>
+      <input id="presetName" type="text" spellcheck="false" title="Nome del preset (modificabile)">
+      <select id="presetSelect" title="Scegli un preset salvato" aria-label="Preset salvati"></select>
+    </div>
+    <button id="nextPreset" class="icon-btn" title="Preset successivo" aria-label="Preset successivo">
+      <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+    </button>
+    <div class="preset-actions">
+      <button id="savePreset" class="btn primary" title="Salva il preset con questo nome">Salva</button>
+      <button id="newPreset" class="btn ghost" title="Nuovo preset vuoto">Nuovo</button>
+      <button id="deletePreset" class="btn ghost danger" title="Elimina il preset selezionato">Elimina</button>
+    </div>
   </div>
+
   <div class="meters">
     <div class="meter" title="Carico DSP (JACK)">
       <span class="meter-label">DSP</span>
@@ -30,44 +47,58 @@
 </header>
 
 <main>
-  <section class="path-wrap">
-    <div id="path" class="path"></div>
+ <div id="boardView">
+  <section class="stage">
+    <div class="stage-head">
+      <span class="section-title">Catena del segnale</span>
+      <span class="stage-hint">Clic: modifica · Doppio clic: on/off · Trascina per riordinare</span>
+      <button id="rowsBtn" class="btn ghost small" title="Prosegui la catena su una seconda riga, come il secondo percorso dell'Helix">+ Riga 2</button>
+    </div>
+    <div class="path-wrap">
+      <div id="path" class="path"></div>
+    </div>
   </section>
 
   <section id="editor" class="editor"></section>
 
-  <section class="testbar live">
-    <span class="testbar-label">Suona dal vivo</span>
-    <select id="liveInput" title="Ingresso (es. la scheda audio della HX Stomp)"><option value="">Ingresso…</option></select>
-    <select id="liveChannel" title="Canale dell'ingresso a cui è collegata la chitarra">
-      <option value="0">Canale 1 (L)</option>
-      <option value="1">Canale 2 (R)</option>
-    </select>
-    <select id="liveOutput" title="Uscita audio"><option value="">Uscita predefinita</option></select>
-    <select id="liveBuffer" title="Buffer anti-scatti: più basso = meno ritardo, più alto = meno crepitii">
-      <option value="256">Buffer 256</option>
-      <option value="512" selected>Buffer 512</option>
-      <option value="1024">Buffer 1024</option>
-      <option value="2048">Buffer 2048</option>
-    </select>
-    <label class="gain" title="Guadagno d'ingresso: alzalo se l'indicatore IN si muove poco">
-      Guadagno <input id="liveGain" type="range" min="0" max="36" step="1" value="0">
-      <span id="liveGainValue">+0 dB</span>
-    </label>
-    <button id="liveBtn" class="btn primary">● Attiva</button>
-    <div class="vu" title="Livello ingresso"><span>IN</span><div class="vu-bar"><div id="vuIn"></div></div></div>
-    <div class="vu" title="Livello uscita"><span>OUT</span><div class="vu-bar"><div id="vuOut"></div></div></div>
-    <span id="liveInfo" class="hint"></span>
-  </section>
+  <details class="drawer" id="testDrawer">
+    <summary><span class="section-title">Prova con file</span><span class="drawer-sub">ascolta la catena su una chitarra registrata (DI)</span></summary>
+    <div class="testbar">
+      <select id="diSelect" title="File DI (chitarra registrata senza effetti)"></select>
+      <label class="btn ghost">Carica DI<input id="diUpload" type="file" accept=".wav,audio/wav" hidden></label>
+      <button id="renderBtn" class="btn primary">▶ Ascolta</button>
+      <span id="renderInfo" class="hint"></span>
+      <audio id="player" controls></audio>
+    </div>
+  </details>
 
-  <section class="testbar">
-    <span class="testbar-label">Prova con file</span>
-    <select id="diSelect" title="File DI (chitarra registrata senza effetti)"></select>
-    <label class="btn ghost">Carica DI<input id="diUpload" type="file" accept=".wav,audio/wav" hidden></label>
-    <button id="renderBtn" class="btn primary">▶ Ascolta</button>
-    <span id="renderInfo" class="hint"></span>
-    <audio id="player" controls></audio>
-  </section>
+  <details class="drawer" id="liveDrawer">
+    <summary><span class="section-title">Suona dal browser</span><span class="drawer-sub">solo se Alice non usa direttamente la scheda audio</span></summary>
+    <div class="testbar live">
+      <select id="liveInput" title="Ingresso (es. la scheda audio della HX Stomp)"><option value="">Ingresso…</option></select>
+      <select id="liveChannel" title="Canale dell'ingresso a cui è collegata la chitarra">
+        <option value="0">Canale 1 (L)</option>
+        <option value="1">Canale 2 (R)</option>
+      </select>
+      <select id="liveOutput" title="Uscita audio"><option value="">Uscita predefinita</option></select>
+      <select id="liveBuffer" title="Buffer anti-scatti: più basso = meno ritardo, più alto = meno crepitii">
+        <option value="256">Buffer 256</option>
+        <option value="512" selected>Buffer 512</option>
+        <option value="1024">Buffer 1024</option>
+        <option value="2048">Buffer 2048</option>
+      </select>
+      <label class="gain" title="Guadagno d'ingresso: alzalo se l'indicatore IN si muove poco">
+        Guadagno <input id="liveGain" type="range" min="0" max="36" step="1" value="0">
+        <span id="liveGainValue">+0 dB</span>
+      </label>
+      <button id="liveBtn" class="btn primary">● Attiva</button>
+      <div class="vu" title="Livello ingresso"><span>IN</span><div class="vu-bar"><div id="vuIn"></div></div></div>
+      <div class="vu" title="Livello uscita"><span>OUT</span><div class="vu-bar"><div id="vuOut"></div></div></div>
+      <span id="liveInfo" class="hint"></span>
+    </div>
+  </details>
+ </div>
+ <section id="storeView" class="store" hidden></section>
 </main>
 
 <div id="toast" class="toast"></div>

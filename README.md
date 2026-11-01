@@ -4,9 +4,12 @@ Modeler per chitarra open source, controllato via web, pensato per pedaliere fat
 (Raspberry Pi 5, mini-PC x86). Usa profili [NAM](https://github.com/sdatkinson/neural-amp-modeler)
 e plugin LV2, con un'interfaccia a blocchi ispirata a Line 6 Helix.
 
-> Stato: **prima versione in sviluppo**. Funzionano il motore audio, l'interfaccia web con
-> percorso in serie, i profili NAM, gli IR, i preset e la prova d'ascolto. In arrivo: blocchi in
-> parallelo nell'interfaccia (il motore li gestisce già), footswitch/MIDI, snapshot.
+Sito del progetto: **https://teopost.github.io/alice/**
+
+> Stato: **prima versione in sviluppo**. Funzionano il motore audio, l'interfaccia web a blocchi
+> con 66 effetti, i percorsi in parallelo (anche su due righe, come sull'Helix), i profili NAM e
+> gli IR (anche dal negozio TONE3000), i preset e la prova d'ascolto. In arrivo: footswitch/MIDI,
+> snapshot.
 
 ## Avvio rapido (anche su PC/WSL2, senza scheda audio)
 

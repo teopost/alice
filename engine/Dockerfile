@@ -32,7 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         lilv-utils lsp-plugins-lv2 guitarix-lv2 dragonfly-reverb-lv2 \
         python3 python3-jack-client python3-soundfile python3-numpy python3-lilv \
         python3-fastapi python3-uvicorn python3-websockets \
-        sox procps netcat-openbsd \
+        sox procps netcat-openbsd ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /out/ /

@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alice · Open-source guitar multi-effects</title>
+<meta name="description" content="Alice turns a Linux PC or a Raspberry Pi into a Helix-style guitar modeler: NAM captures, 66 effects, parallel paths and a web interface for any tablet.">
+<meta name="theme-color" content="#0b0c0e">
+<meta property="og:title" content="Alice · Open-source guitar multi-effects">
+<meta property="og:description" content="NAM captures, 66 effects, parallel paths and a web interface. Runs on Linux and Raspberry Pi.">
+<meta property="og:image" content="assets/hero-chain.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23e04040'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3Ea%3C/text%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #0b0c0e; --bg-2: #101215; --panel: #16181c; --panel-2: #1d2025; --line: #2a2e34; --line-2: #3a3f47;
+  --text: #eceef1; --muted: #9aa1ab; --dim: #646b75; --accent: #e04040; --accent-2: #ff6b5b;
+  --violet: #b9a6ff; --green: #7cf0b6;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 var(--sans);
+  -webkit-font-smoothing: antialiased; overflow-x: hidden;
+}
+a { color: inherit; }
+img { max-width: 100%; height: auto; display: block; }
+.wrap { width: min(1180px, 100% - 40px); margin-inline: auto; }
+
+/* ---------- barra ---------- */
+.nav {
+  position: sticky; top: 0; z-index: 20;
+  padding-top: env(safe-area-inset-top, 0px);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid #ffffff0d;
+}
+.nav .wrap { display: flex; align-items: center; gap: 24px; height: 64px; }
+.logo { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 800; font-size: 20px; letter-spacing: .5px; }
+.logo-mark {
+  width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center;
+  background: linear-gradient(145deg, #f05252, #b52a2a); color: #fff; font-size: 19px;
+  box-shadow: 0 0 20px #e0404066, inset 0 1px 0 #ffffff40;
+}
+.nav-links { display: flex; gap: 22px; margin-left: 12px; }
+.nav-links a { color: var(--muted); text-decoration: none; font-size: 14.5px; font-weight: 600; }
+.nav-links a:hover { color: var(--text); }
+.nav-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.lang {
+  display: flex; padding: 3px; gap: 2px; border-radius: 999px; background: #000; border: 1px solid var(--line);
+}
+.lang button {
+  border: 0; background: transparent; color: var(--muted); cursor: pointer;
+  font: 700 12px var(--mono); letter-spacing: 1px; padding: 6px 10px; border-radius: 999px;
+}
+.lang button[aria-pressed="true"] { background: var(--panel-2); color: var(--text); }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; text-decoration: none; cursor: pointer;
+  padding: 11px 20px; border-radius: 10px; font-weight: 700; font-size: 15px; border: 1px solid var(--line-2);
+  background: linear-gradient(#22262b, #1a1d21); color: var(--text); transition: transform .12s, border-color .15s, box-shadow .15s;
+}
+.btn:hover { transform: translateY(-1px); border-color: #5a616b; }
+.btn.primary { background: linear-gradient(#ea4a4a, #c53434); border-color: #f06060; color: #fff; box-shadow: 0 8px 30px #e0404040; }
+.btn.primary:hover { box-shadow: 0 10px 36px #e0404066; }
+.btn.small { padding: 8px 14px; font-size: 13.5px; }
+.btn svg { width: 18px; height: 18px; fill: currentColor; }
+
+/* ---------- hero ---------- */
+.hero { position: relative; padding: 90px 0 40px; text-align: center; overflow: hidden; }
+.hero::before {
+  content: ""; position: absolute; inset: -200px -10% auto; height: 700px; z-index: -1;
+  background:
+    radial-gradient(600px 300px at 30% 30%, #e0404033, transparent 70%),
+    radial-gradient(600px 320px at 72% 25%, #6b4dff26, transparent 70%),
+    radial-gradient(800px 400px at 50% 80%, #3ac06a14, transparent 70%);
+}
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 10px; padding: 6px 14px 6px 8px; border-radius: 999px;
+  background: #ffffff08; border: 1px solid #ffffff14; font-size: 13.5px; color: var(--muted); font-weight: 600;
+}
+.eyebrow .pill { white-space: nowrap; font: 800 10.5px var(--mono); letter-spacing: 1px; color: var(--green); background: #3ac06a1f; border: 1px solid #3ac06a44; padding: 3px 8px; border-radius: 999px; }
+h1 {
+  font-size: clamp(40px, 7vw, 82px); line-height: 1.02; letter-spacing: -2px; margin: 22px auto 18px; max-width: 17ch; font-weight: 850;
+}
+h1 .grad { background: linear-gradient(90deg, #fff 10%, var(--accent-2) 55%, var(--violet)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.lead { font-size: clamp(17px, 2.1vw, 20px); color: var(--muted); max-width: 680px; margin: 0 auto 32px; }
+.cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.tags { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 26px; }
+.tag { font: 600 12px var(--mono); color: var(--dim); border: 1px solid var(--line); padding: 4px 10px; border-radius: 6px; }
+
+.shot {
+  position: relative; margin: 60px auto 0; border-radius: 18px; padding: 10px;
+  background: linear-gradient(180deg, #ffffff14, #ffffff05); border: 1px solid #ffffff14;
+  box-shadow: 0 40px 120px #000c, 0 0 0 1px #000, 0 0 120px #e0404018;
+}
+.shot::before {
+  content: ""; display: block; height: 22px; margin: 0 4px 8px;
+  background: radial-gradient(circle at 8px 11px, #ff5f57 5px, transparent 5.5px), radial-gradient(circle at 26px 11px, #febc2e 5px, transparent 5.5px), radial-gradient(circle at 44px 11px, #28c840 5px, transparent 5.5px);
+}
+.shot img { border-radius: 10px; width: 100%; }
+.shot-caption { color: var(--dim); font-size: 14px; margin-top: 16px; }
+.shot-caption b { color: var(--muted); font-weight: 600; }
+
+/* ---------- numeri ---------- */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin: 70px 0 0; background: var(--line); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.stat { background: var(--bg-2); padding: 26px 20px; text-align: center; }
+.stat b { display: block; font-size: 34px; font-weight: 850; letter-spacing: -1px; }
+.stat span { color: var(--muted); font-size: 14px; }
+
+/* ---------- sezioni ---------- */
+section { padding: 100px 0 0; }
+.kicker { font: 700 12px var(--mono); letter-spacing: 2.5px; text-transform: uppercase; color: var(--accent-2); }
+h2 { font-size: clamp(30px, 4.4vw, 46px); line-height: 1.1; letter-spacing: -1px; margin: 10px 0 14px; font-weight: 820; }
+.sub { color: var(--muted); font-size: 18px; max-width: 640px; margin: 0 0 44px; }
+
+.features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.feature {
+  position: relative; padding: 26px; border-radius: 16px; background: linear-gradient(160deg, color-mix(in srgb, var(--c) 9%, var(--panel)), var(--panel));
+  border: 1px solid var(--line); overflow: hidden; transition: transform .15s, border-color .15s;
+}
+.feature:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--c) 45%, var(--line)); }
+.feature .ico {
+  width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; margin-bottom: 16px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--c) 45%, #2a2e35), color-mix(in srgb, var(--c) 15%, #141619));
+  color: color-mix(in srgb, var(--c) 30%, #fff); box-shadow: inset 0 1px 0 #ffffff22, 0 0 24px color-mix(in srgb, var(--c) 25%, transparent);
+}
+.feature .ico svg { width: 24px; height: 24px; }
+.feature h3 { margin: 0 0 6px; font-size: 18.5px; }
+.feature p { margin: 0; color: var(--muted); font-size: 15px; }
+
+.duo { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+.panel-shot { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 24px 60px #000a; background: var(--panel); }
+.duo h3 { margin: 18px 0 6px; font-size: 20px; }
+.duo p { margin: 0; color: var(--muted); }
+
+/* ---------- schema ---------- */
+.flow { display: flex; align-items: center; gap: 0; flex-wrap: wrap; justify-content: center; padding: 34px; border-radius: 18px; border: 1px solid var(--line); background: var(--bg-2); }
+.flow .node {
+  padding: 14px 18px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line-2); text-align: center; min-width: 150px;
+}
+.flow .node b { display: block; font-size: 15px; }
+.flow .node span { font: 12px var(--mono); color: var(--dim); }
+.flow .node.hot { border-color: #e0404088; box-shadow: 0 0 30px #e0404022; }
+.flow .arrow { width: 36px; height: 4px; background: var(--line-2); position: relative; flex: none; }
+.flow .arrow::after { content: ""; position: absolute; right: -2px; top: -4px; border: 6px solid transparent; border-left-color: var(--line-2); border-right: 0; }
+.stack { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
+.stack div { padding: 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); }
+.stack b { display: block; margin-bottom: 4px; }
+.stack span { color: var(--muted); font-size: 14px; }
+
+/* ---------- avvio ---------- */
+.steps { display: grid; gap: 16px; counter-reset: s; }
+.step { display: grid; grid-template-columns: 44px 1fr; gap: 18px; align-items: start; }
+.step::before {
+  counter-increment: s; content: counter(s); width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  font: 800 16px var(--mono); background: var(--panel-2); border: 1px solid var(--line-2);
+}
+.step h3 { margin: 6px 0 8px; font-size: 18px; }
+.step p { margin: 0 0 10px; color: var(--muted); }
+pre {
+  position: relative; margin: 0; padding: 16px 52px 16px 18px; border-radius: 12px; overflow-x: auto;
+  background: #07080a; border: 1px solid var(--line); font: 14px/1.6 var(--mono); color: #d7dbe0;
+}
+pre .c { color: var(--dim); }
+.copy {
+  position: absolute; top: 10px; right: 10px; border: 1px solid var(--line-2); background: var(--panel-2); color: var(--muted);
+  border-radius: 7px; padding: 4px 8px; font: 600 11.5px var(--sans); cursor: pointer;
+}
+.copy:hover { color: var(--text); }
+.note { margin-top: 18px; padding: 14px 18px; border-radius: 12px; border: 1px solid #b9a6ff33; background: #b9a6ff0d; color: #cfc6ff; font-size: 15px; }
+
+/* ---------- chiusura ---------- */
+.final { margin: 110px 0 0; padding: 60px 30px; text-align: center; border-radius: 22px; border: 1px solid var(--line);
+  background: radial-gradient(600px 240px at 50% 0%, #e0404026, transparent 70%), var(--bg-2); }
+.final h2 { margin-top: 0; }
+footer { padding: 50px 0 calc(40px + env(safe-area-inset-bottom, 0px)); color: var(--dim); font-size: 14px; }
+footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 26px; }
+footer a { color: var(--muted); }
+
+/* ---------- comparsa allo scorrimento ---------- */
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity .7s ease, transform .7s ease; }
+.reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } html { scroll-behavior: auto; } }
+
+@media (max-width: 900px) {
+  .features, .stack { grid-template-columns: 1fr 1fr; }
+  .duo { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: 1fr 1fr; }
+  .nav-links { display: none; }
+}
+@media (max-width: 560px) {
+  .features, .stack { grid-template-columns: 1fr; }
+  .hero { padding-top: 60px; }
+  .flow { flex-direction: column; }
+  .flow .arrow { width: 4px; height: 26px; }
+  .flow .arrow::after { right: -4px; top: auto; bottom: -2px; border: 6px solid transparent; border-top-color: var(--line-2); border-bottom: 0; }
+  .nav .btn span { display: none; }
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap">
+    <a class="logo" href="#top"><span class="logo-mark">a</span>alice</a>
+    <div class="nav-links">
+      <a href="#features" data-i18n="nav.features">Features</a>
+      <a href="#how" data-i18n="nav.how">How it works</a>
+      <a href="#start" data-i18n="nav.start">Get started</a>
+    </div>
+    <div class="nav-right">
+      <div class="lang" role="group" aria-label="Language">
+        <button data-lang="en" aria-pressed="true">EN</button>
+        <button data-lang="it" aria-pressed="false">IT</button>
+      </div>
+      <a class="btn small" href="https://github.com/teopost/alice">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <span class="eyebrow"><span class="pill">OPEN SOURCE</span><span data-i18n="hero.eyebrow">Guitar multi-effects for Linux &amp; Raspberry Pi</span></span>
+    <h1 data-i18n-html="hero.title">Your pedalboard, <span class="grad">rebuilt in code.</span></h1>
+    <p class="lead" data-i18n="hero.lead">Alice turns a Linux PC or a Raspberry Pi into a Helix-style modeler: neural amp captures, 66 effects, parallel paths and a web interface you can drive from any tablet or phone.</p>
+    <div class="cta">
+      <a class="btn primary" href="#start" data-i18n="hero.cta">Get started</a>
+      <a class="btn" href="https://github.com/teopost/alice" data-i18n="hero.github">View the code</a>
+    </div>
+    <div class="tags"><span class="tag">NAM</span><span class="tag">LV2</span><span class="tag">JACK</span><span class="tag">Docker</span><span class="tag">GPL-3.0</span></div>
+
+    <figure class="shot reveal" style="margin-bottom:0">
+      <picture><img src="assets/hero-chain.webp" width="2800" height="664" alt="Alice signal chain: noise gate and compressor, two amps in parallel (Tube Screamer into JCM 800, clean preamp into chorus), a 4x12 IR cab, then delay and reverb in parallel" data-i18n-alt="hero.alt"></picture>
+    </figure>
+    <p class="shot-caption" data-i18n-html="hero.caption"><b>A real Alice rig.</b> Two amps in parallel (driven and clean with chorus), a 4x12 IR cab, then delay and reverb side by side so they stay clear.</p>
+
+    <div class="stats reveal">
+      <div class="stat"><b>66</b><span data-i18n="stats.effects">effects &amp; amps</span></div>
+      <div class="stat"><b>6</b><span data-i18n="stats.lanes">parallel lanes per split</span></div>
+      <div class="stat"><b>2×12</b><span data-i18n="stats.grid">block grid, Helix style</span></div>
+      <div class="stat"><b>5&nbsp;ms</b><span data-i18n="stats.latency">audio buffer on real hardware</span></div>
+    </div>
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap">
+    <div class="kicker" data-i18n="feat.kicker">Features</div>
+    <h2 data-i18n="feat.title">Everything a modern modeler needs.</h2>
+    <p class="sub" data-i18n="feat.sub">Built on proven open-source audio tools, wrapped in an interface that feels like pro hardware.</p>
+    <div class="features">
+      <div class="feature reveal" style="--c:#e04040">
+        <div class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="16" cy="12" r="1.6" fill="currentColor"/></svg></div>
+        <h3 data-i18n="f1.t">Neural Amp Modeler</h3>
+        <p data-i18n="f1.d">Load NAM captures of real amps, pedals and full rigs, plus impulse responses for the cab.</p>
+      </div>
+      <div class="feature reveal" style="--c:#f0902a">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M13 2L5 14h6l-1 8 8-12h-6z" fill="currentColor"/></svg></div>
+        <h3 data-i18n="f2.t">66 effects and amps</h3>
+        <p data-i18n="f2.d">Overdrives, fuzzes, wahs, compressors, modulation, delays, reverbs and pitch, from Guitarix, LSP and Dragonfly.</p>
+      </div>
+      <div class="feature reveal" style="--c:#3a8de0">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M3 12h4M7 12c3 0 3-6 6-6h4M7 12c3 0 3 6 6 6h4M17 6h4M17 18h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <h3 data-i18n="f3.t">Parallel paths</h3>
+        <p data-i18n="f3.d">Split the signal into up to six lanes and drag the split and merge nodes anywhere, like on a Fractal.</p>
+      </div>
+      <div class="feature reveal" style="--c:#3ac06a">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 7h14M4 17h14M18 7v10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="4" cy="7" r="2" fill="currentColor"/><circle cx="4" cy="17" r="2" fill="currentColor"/></svg></div>
+        <h3 data-i18n="f4.t">Two-row grid</h3>
+        <p data-i18n="f4.d">When one row is not enough, continue the chain on a second row, just like linking the two paths on a Helix.</p>
+      </div>
+      <div class="feature reveal" style="--c:#b9a6ff">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 7h16l-1.5 11a2 2 0 0 1-2 1.7H7.5a2 2 0 0 1-2-1.7z M9 7a3 3 0 0 1 6 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></div>
+        <h3 data-i18n="f5.t">TONE3000 store</h3>
+        <p data-i18n="f5.d">Browse trending and new community captures and install them with one click, straight into a NAM block.</p>
+      </div>
+      <div class="feature reveal" style="--c:#e8c33a">
+        <div class="ico"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 18h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <h3 data-i18n="f6.t">Any device, no install</h3>
+        <p data-i18n="f6.d">The interface runs in the browser: tweak your tone from a laptop, a tablet on the music stand or your phone.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="kicker" data-i18n="ui.kicker">Interface</div>
+    <h2 data-i18n="ui.title">Designed to be played, not configured.</h2>
+    <p class="sub" data-i18n="ui.sub">Big metal knobs, footswitch-style bypass and a searchable library with a short description for every block.</p>
+    <div class="duo">
+      <div class="reveal">
+        <div class="panel-shot"><img src="assets/editor.webp" width="2800" height="516" alt="Block editor with knobs for the JCM 800 preamp" data-i18n-alt="ui.alt1" loading="lazy"></div>
+        <h3 data-i18n="ui.t1">Every block, its own panel</h3>
+        <p data-i18n="ui.d1">Drag a knob, use the mouse wheel for fine steps, double-click to reset. Changes are heard instantly.</p>
+      </div>
+      <div class="reveal">
+        <div class="panel-shot"><img src="assets/library.webp" width="2800" height="1002" alt="Effect library grouped by category, showing the amp models" data-i18n-alt="ui.alt2" loading="lazy"></div>
+        <h3 data-i18n="ui.t2">A library you can search</h3>
+        <p data-i18n="ui.d2">Ten categories, colour-coded like the blocks in the chain. Type a few letters to find any effect.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="kicker" data-i18n="how.kicker">How it works</div>
+    <h2 data-i18n="how.title">Pro audio plumbing under the hood.</h2>
+    <p class="sub" data-i18n="how.sub">Your guitar goes straight into a real-time audio graph. The web interface only sends commands, so it never adds latency.</p>
+    <div class="flow reveal">
+      <div class="node"><b data-i18n="how.n1">Guitar</b><span data-i18n="how.n1s">your instrument</span></div>
+      <div class="arrow"></div>
+      <div class="node"><b data-i18n="how.n2">Audio interface</b><span>USB · ALSA</span></div>
+      <div class="arrow"></div>
+      <div class="node hot"><b>JACK + mod-host</b><span data-i18n="how.n3s">LV2 plugins + NAM</span></div>
+      <div class="arrow"></div>
+      <div class="node"><b data-i18n="how.n4">Amp or headphones</b><span data-i18n="how.n4s">processed sound</span></div>
+    </div>
+    <div class="stack reveal">
+      <div><b>JACK</b><span data-i18n="how.s1">Low-latency audio server that connects every block.</span></div>
+      <div><b>mod-host</b><span data-i18n="how.s2">Hosts the LV2 plugins and the NAM engine.</span></div>
+      <div><b>FastAPI</b><span data-i18n="how.s3">Backend that turns the chain into connections.</span></div>
+      <div><b data-i18n="how.s4t">Web UI</b><span data-i18n="how.s4">Plain JavaScript, works offline on the pedalboard.</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="start">
+  <div class="wrap">
+    <div class="kicker" data-i18n="start.kicker">Get started</div>
+    <h2 data-i18n="start.title">Up and running in three commands.</h2>
+    <p class="sub" data-i18n="start.sub">All you need is Docker. Try it on any PC first, then connect a real audio interface.</p>
+    <div class="steps">
+      <div class="step reveal">
+        <div>
+          <h3 data-i18n="s1.t">Get the code</h3>
+          <pre><code>git clone https://github.com/teopost/alice
+cd alice</code><button class="copy" data-i18n="copy">Copy</button></pre>
+        </div>
+      </div>
+      <div class="step reveal">
+        <div>
+          <h3 data-i18n="s2.t">Start Alice</h3>
+          <p data-i18n="s2.d">Without an audio interface, Alice runs on a virtual sound card: perfect for building presets.</p>
+          <pre><code>docker compose up -d --build</code><button class="copy" data-i18n="copy">Copy</button></pre>
+        </div>
+      </div>
+      <div class="step reveal">
+        <div>
+          <h3 data-i18n="s3.t">Open the interface</h3>
+          <p data-i18n-html="s3.d">Go to <b>http://localhost:8090</b>, or use your computer's address from a tablet on the same network.</p>
+          <pre><code>http://localhost:8090</code><button class="copy" data-i18n="copy">Copy</button></pre>
+        </div>
+      </div>
+      <div class="step reveal">
+        <div>
+          <h3 data-i18n="s4.t">Plug in your guitar</h3>
+          <p data-i18n="s4.d">On Linux or Raspberry Pi, set your interface in docker-compose.hw.yml (for example hw:Stomp) and start with direct hardware access.</p>
+          <pre><code>docker compose -f docker-compose.yml -f docker-compose.hw.yml up -d --build</code><button class="copy" data-i18n="copy">Copy</button></pre>
+        </div>
+      </div>
+    </div>
+    <div class="note" data-i18n="start.note">Tested with a Line 6 HX Stomp used as a USB audio interface: the dry DI signal goes into Alice and the processed sound comes back to the Stomp's outputs.</div>
+
+    <div class="final reveal">
+      <h2 data-i18n="final.title">Build the rig you actually want.</h2>
+      <p class="sub" style="margin-inline:auto" data-i18n="final.sub">Alice is free software. Use it, change it, share your presets.</p>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/teopost/alice" data-i18n="final.cta">Get Alice on GitHub</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span data-i18n-html="foot.l">Alice is released under the <a href="https://www.gnu.org/licenses/gpl-3.0.html">GPL-3.0</a> license.</span>
+    <span data-i18n-html="foot.r">NAM captures from <a href="https://www.tone3000.com">TONE3000</a> · Built on JACK, mod-host and LV2.</span>
+  </div>
+</footer>
+
+<script>
+// Traduzioni: l'inglese è nel markup, qui c'è l'italiano (e l'inglese per tornare indietro).
+const IT = {
+  "nav.features": "Funzioni", "nav.how": "Come funziona", "nav.start": "Inizia",
+  "hero.eyebrow": "Multi-effetto per chitarra su Linux e Raspberry Pi",
+  "hero.title": 'La tua pedaliera, <span class="grad">riscritta in codice.</span>',
+  "hero.lead": "Alice trasforma un PC Linux o un Raspberry Pi in un modeler in stile Helix: catture neurali di amplificatori, 66 effetti, percorsi in parallelo e un'interfaccia web da usare con tablet o telefono.",
+  "hero.cta": "Inizia subito", "hero.github": "Guarda il codice",
+  "hero.alt": "Catena del segnale di Alice: noise gate e compressore, due ampli in parallelo (Tube Screamer nel JCM 800 e preamp pulito nel chorus), cassa IR 4x12, poi delay e riverbero in parallelo",
+  "hero.caption": "<b>Un vero rig di Alice.</b> Due ampli in parallelo (distorto e pulito con chorus), una cassa IR 4x12, poi delay e riverbero affiancati per restare limpidi.",
+  "stats.effects": "effetti e ampli", "stats.lanes": "rami in parallelo per gruppo", "stats.grid": "griglia di blocchi, stile Helix", "stats.latency": "di buffer audio su hardware reale",
+  "feat.kicker": "Funzioni", "feat.title": "Tutto quello che serve a un modeler moderno.",
+  "feat.sub": "Costruito su strumenti audio open source collaudati, con un'interfaccia che sembra hardware professionale.",
+  "f1.t": "Neural Amp Modeler", "f1.d": "Carica catture NAM di ampli, pedali e rig completi, più le risposte all'impulso per la cassa.",
+  "f2.t": "66 effetti e ampli", "f2.d": "Overdrive, fuzz, wah, compressori, modulazioni, delay, riverberi e pitch, da Guitarix, LSP e Dragonfly.",
+  "f3.t": "Percorsi in parallelo", "f3.d": "Dividi il segnale fino a sei rami e trascina i nodi di divisione e unione dove vuoi, come su un Fractal.",
+  "f4.t": "Griglia su due righe", "f4.d": "Quando una riga non basta, prosegui la catena su una seconda riga, come collegando i due percorsi di un Helix.",
+  "f5.t": "Negozio TONE3000", "f5.d": "Sfoglia le catture della community, di tendenza e nuove, e installale con un clic direttamente in un blocco NAM.",
+  "f6.t": "Qualsiasi dispositivo, niente da installare", "f6.d": "L'interfaccia gira nel browser: regola il suono dal portatile, da un tablet sul leggio o dal telefono.",
+  "ui.kicker": "Interfaccia", "ui.title": "Pensata per suonare, non per configurare.",
+  "ui.sub": "Grandi manopole metalliche, bypass in stile footswitch e una libreria con ricerca e una breve descrizione per ogni blocco.",
+  "ui.alt1": "Editor del blocco con le manopole del preamp JCM 800", "ui.alt2": "Libreria degli effetti divisa per categorie, con i modelli di ampli",
+  "ui.t1": "Ogni blocco, il suo pannello", "ui.d1": "Trascina una manopola, usa la rotella per i passi fini, doppio clic per tornare al valore iniziale. Le modifiche si sentono subito.",
+  "ui.t2": "Una libreria con la ricerca", "ui.d2": "Dieci categorie, con gli stessi colori dei blocchi nella catena. Scrivi poche lettere per trovare qualsiasi effetto.",
+  "how.kicker": "Come funziona", "how.title": "Tecnologia audio professionale sotto il cofano.",
+  "how.sub": "La chitarra entra direttamente in un grafo audio in tempo reale. L'interfaccia web invia solo comandi, quindi non aggiunge latenza.",
+  "how.n1": "Chitarra", "how.n1s": "il tuo strumento", "how.n2": "Scheda audio", "how.n3s": "plugin LV2 + NAM",
+  "how.n4": "Ampli o cuffie", "how.n4s": "suono elaborato",
+  "how.s1": "Server audio a bassa latenza che collega tutti i blocchi.", "how.s2": "Ospita i plugin LV2 e il motore NAM.",
+  "how.s3": "Il backend che trasforma la catena in collegamenti.", "how.s4t": "Interfaccia web", "how.s4": "JavaScript puro, funziona offline sulla pedaliera.",
+  "start.kicker": "Inizia", "start.title": "Pronto in tre comandi.", "start.sub": "Ti serve solo Docker. Provalo prima su un PC qualsiasi, poi collega una vera scheda audio.",
+  "s1.t": "Scarica il codice", "s2.t": "Avvia Alice", "s2.d": "Senza scheda audio, Alice usa una scheda virtuale: perfetto per preparare i preset.",
+  "s3.t": "Apri l'interfaccia", "s3.d": "Vai su <b>http://localhost:8090</b>, oppure usa l'indirizzo del computer da un tablet nella stessa rete.",
+  "s4.t": "Collega la chitarra", "s4.d": "Su Linux o Raspberry Pi imposta la scheda audio in docker-compose.hw.yml (per esempio hw:Stomp) e avvia con l'accesso diretto all'hardware.",
+  "start.note": "Provato con una Line 6 HX Stomp usata come scheda audio USB: il segnale pulito (DI) entra in Alice e il suono elaborato torna alle uscite della Stomp.",
+  "final.title": "Costruisci il rig che vuoi davvero.", "final.sub": "Alice è software libero. Usalo, modificalo, condividi i tuoi preset.", "final.cta": "Scarica Alice da GitHub",
+  "foot.l": 'Alice è distribuita con licenza <a href="https://www.gnu.org/licenses/gpl-3.0.html">GPL-3.0</a>.',
+  "foot.r": 'Catture NAM da <a href="https://www.tone3000.com">TONE3000</a> · Basata su JACK, mod-host e LV2.',
+  "copy": "Copia", "copied": "Copiato",
+};
+const EN = { copied: "Copied" };
+// il testo inglese originale si legge dal markup la prima volta
+document.querySelectorAll("[data-i18n]").forEach((el) => (EN[el.dataset.i18n] = el.textContent));
+document.querySelectorAll("[data-i18n-html]").forEach((el) => (EN[el.dataset.i18nHtml] = el.innerHTML));
+document.querySelectorAll("[data-i18n-alt]").forEach((el) => (EN[el.dataset.i18nAlt] = el.alt));
+
+let lang = "en";
+function setLang(l) {
+  lang = l;
+  const dict = l === "it" ? IT : EN;
+  document.documentElement.lang = l;
+  document.querySelectorAll("[data-i18n]").forEach((el) => { if (dict[el.dataset.i18n]) el.textContent = dict[el.dataset.i18n]; });
+  document.querySelectorAll("[data-i18n-html]").forEach((el) => { if (dict[el.dataset.i18nHtml]) el.innerHTML = dict[el.dataset.i18nHtml]; });
+  document.querySelectorAll("[data-i18n-alt]").forEach((el) => { if (dict[el.dataset.i18nAlt]) el.alt = dict[el.dataset.i18nAlt]; });
+  document.querySelectorAll(".lang button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === l)));
+  document.title = l === "it" ? "Alice · Multi-effetto open source per chitarra" : "Alice · Open-source guitar multi-effects";
+  try { localStorage.setItem("alice.lang", l); } catch {}
+}
+document.querySelectorAll(".lang button").forEach((b) => (b.onclick = () => setLang(b.dataset.lang)));
+let saved = null;
+try { saved = localStorage.getItem("alice.lang"); } catch {}
+const browserLang = (navigator.language || "en").toLowerCase().startsWith("it") ? "it" : "en";
+setLang(saved === "it" || saved === "en" ? saved : browserLang);
+
+// copia dei comandi
+document.querySelectorAll(".copy").forEach((btn) => {
+  btn.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(btn.parentElement.querySelector("code").textContent);
+      btn.textContent = (lang === "it" ? IT : EN).copied;
+      setTimeout(() => (btn.textContent = (lang === "it" ? IT : EN).copy), 1500);
+    } catch {}
+  };
+});
+
+// comparsa delle sezioni allo scorrimento
+const io = "IntersectionObserver" in window && new IntersectionObserver((entries) => {
+  for (const e of entries) if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+}, { threshold: 0.12 });
+document.querySelectorAll(".reveal").forEach((el) => (io ? io.observe(el) : el.classList.add("in")));
+</script>
+</body>
+</html>
