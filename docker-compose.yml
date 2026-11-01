@@ -1,5 +1,5 @@
 # Sviluppo su PC (anche WSL2): JACK con driver "dummy", nessuna scheda audio.
-# Interfaccia web: http://localhost:8090
+# Interfaccia web: http://localhost:8090 (ponte audio col browser sulla porta 8091)
 # Su Linux nativo / Raspberry Pi usare anche docker-compose.hw.yml:
 #   docker compose -f docker-compose.yml -f docker-compose.hw.yml up -d
 services:
@@ -14,7 +14,8 @@ services:
       ALICE_SAMPLE_RATE: 48000
       ALICE_BUFFER_SIZE: 128
     ports:
-      - "8090:8090"
+      - "8090:8090"   # interfaccia web
+      - "8091:8091"   # ponte audio col browser
     volumes:
       - ./data:/data
       # sviluppo: codice montato dal repository (riavviare il container dopo le modifiche)

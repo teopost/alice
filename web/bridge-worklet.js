@@ -7,6 +7,8 @@ class AliceBridge extends AudioWorkletProcessor {
     super();
     this.channel = 0;
     this.gain = 1;                // guadagno d'ingresso (lineare)
+    this.sendBuf = new Float32Array(256);
+    this.sendN = 0;
     this.target = 512;            // campioni da accumulare prima di riprodurre
     this.ring = new Float32Array(48000 * 2);
     this.r = 0;                   // contatori assoluti
@@ -45,13 +47,18 @@ class AliceBridge extends AudioWorkletProcessor {
     const input = inputs[0];
     if (input && input.length) {
       const ch = input[Math.min(this.channel, input.length - 1)];
-      const copy = new Float32Array(ch);
-      for (let i = 0; i < copy.length; i++) {
-        copy[i] *= this.gain;
-        const a = Math.abs(copy[i]);
+      // accumula 2 quanti (256 campioni, ~5 ms) per messaggio: meno carico sul server
+      for (let i = 0; i < ch.length; i++) {
+        const v = ch[i] * this.gain;
+        const a = Math.abs(v);
         if (a > this.inPeak) this.inPeak = a;
+        this.sendBuf[this.sendN++] = v;
+        if (this.sendN === this.sendBuf.length) {
+          this.port.postMessage(this.sendBuf, [this.sendBuf.buffer]);
+          this.sendBuf = new Float32Array(256);
+          this.sendN = 0;
+        }
       }
-      this.port.postMessage(copy, [copy.buffer]);
     }
 
     // --- riproduzione

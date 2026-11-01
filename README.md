@@ -53,6 +53,8 @@ Un solo container con:
   chorus), Guitarix (drive, delay, modulazioni), Dragonfly (riverberi);
 - **backend** Python/FastAPI (`backend/alice`): stato della pedaliera, routing, file, preset,
   WebSocket con carico DSP;
+- **ponte audio** (`backend/alice/bridge.py`, porta 8091): processo separato che scambia l'audio
+  col browser; separato dal server web perché la sua callback JACK non deve aspettare il GIL;
 - **interfaccia web** (`web/`): JavaScript puro senza dipendenze esterne, funziona offline.
 
 Una pedaliera è una catena di elementi; ogni elemento è un blocco o uno *split* con più rami in
@@ -71,7 +73,7 @@ effetto basta indicare l'URI LV2 e i parametri da mostrare.
 | GET, PUT, DELETE | `/api/presets[/{nome}]` | preset; POST `/api/presets/{nome}/load` per richiamarlo |
 | POST | `/api/render?di=nome.wav` | fa passare un DI nella catena, restituisce il WAV |
 | WS | `/ws` | stato (DSP, xrun) e modifiche fatte da altri dispositivi |
-| WS | `/ws/audio` | ponte audio: blocchi float32 mono a 48 kHz in entrambe le direzioni |
+| WS | porta **8091** | ponte audio (processo `alice.bridge`): blocchi float32 mono a 48 kHz in entrambe le direzioni |
 
 `scripts/alice_poc.py` (prova di fattibilità) parla direttamente con mod-host: mod-host accetta un
 solo client, quindi funziona solo con il backend fermo.

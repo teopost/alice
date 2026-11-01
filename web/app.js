@@ -727,7 +727,8 @@ async function startLive() {
     ctx.createMediaStreamSource(live.stream).connect(node);
     node.connect(ctx.destination);
 
-    const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/audio`);
+    // il ponte è un processo separato sulla porta 8091 (vedi backend/alice/bridge.py)
+    const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.hostname}:8091/`);
     ws.binaryType = "arraybuffer";
     live.ws = ws;
     ws.onmessage = (e) => {
@@ -786,6 +787,20 @@ function setVu(sel, peak) {
 }
 
 function showLiveStats(m) {
+  // diagnostica: invia al server lo stato del ponte (visibile nei log del container)
+  if (live.ws?.readyState === WebSocket.OPEN && (!live.lastDiag || performance.now() - live.lastDiag > 2000)) {
+    live.lastDiag = performance.now();
+    const outSel = $("#liveOutput");
+    live.ws.send(JSON.stringify({
+      type: "diag", ctx: live.ctx?.state, sr: live.ctx?.sampleRate,
+      input: live.stream?.getAudioTracks()[0]?.label,
+      inputChannels: live.stream?.getAudioTracks()[0]?.getSettings().channelCount,
+      output: outSel.hidden ? "(scelta uscita non supportata dal browser)" : outSel.selectedOptions[0]?.text,
+      sinkId: live.ctx?.sinkId, inPeak: +m.inPeak.toFixed(4), outPeak: +m.outPeak.toFixed(4),
+      fill: m.fill, underruns: m.underruns, baseLatency: live.ctx?.baseLatency, outputLatency: live.ctx?.outputLatency,
+      ua: navigator.userAgent,
+    }));
+  }
   setVu("#vuIn", m.inPeak);
   setVu("#vuOut", m.outPeak);
   const ctx = live.ctx;

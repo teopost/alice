@@ -37,14 +37,26 @@ echo "[alice] avvio mod-host (porta $MOD_HOST_PORT, feedback $MOD_HOST_FEEDBACK_
 mod-host -n -p "$MOD_HOST_PORT" -f "$MOD_HOST_FEEDBACK_PORT" &
 HOST_PID=$!
 
-echo "[alice] avvio interfaccia web (porta $ALICE_HTTP_PORT)"
 cd /opt/alice/backend
+echo "[alice] avvio ponte audio col browser (porta $ALICE_BRIDGE_PORT)"
+python3 -m alice.bridge &
+BRIDGE_PID=$!
+# l'Engine collega le porte del ponte alla catena: devono esistere prima
+i=0
+until jack_lsp 2>/dev/null | grep -q "^alice-bridge:src"; do
+  i=$((i + 1))
+  [ "$i" -gt 50 ] && { echo "[alice] il ponte audio non parte" >&2; break; }
+  sleep 0.2
+done
+
+echo "[alice] avvio interfaccia web (porta $ALICE_HTTP_PORT)"
 python3 -m uvicorn alice.app:app --host 0.0.0.0 --port "$ALICE_HTTP_PORT" &
 WEB_PID=$!
 
-trap 'kill $WEB_PID $HOST_PID $JACK_PID 2>/dev/null; wait' INT TERM
+PIDS="$WEB_PID $BRIDGE_PID $HOST_PID $JACK_PID"
+trap 'kill $PIDS 2>/dev/null; wait' INT TERM
 # se uno dei processi termina, esce: Docker riavvia il container
-while kill -0 $JACK_PID && kill -0 $HOST_PID && kill -0 $WEB_PID; do sleep 1; done 2>/dev/null
+while kill -0 $JACK_PID && kill -0 $HOST_PID && kill -0 $BRIDGE_PID && kill -0 $WEB_PID; do sleep 1; done 2>/dev/null
 echo "[alice] un processo è terminato, arresto" >&2
-kill $WEB_PID $HOST_PID $JACK_PID 2>/dev/null
+kill $PIDS 2>/dev/null
 exit 1

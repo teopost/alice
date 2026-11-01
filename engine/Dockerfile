@@ -55,10 +55,11 @@ ENV LV2_PATH=/usr/lib/lv2 \
     MOD_HOST_PORT=5555 \
     MOD_HOST_FEEDBACK_PORT=5556 \
     ALICE_HTTP_PORT=8090 \
+    ALICE_BRIDGE_PORT=8091 \
     ALICE_DATA=/data \
     ALICE_WEB=/opt/alice/web
 
 VOLUME ["/data"]
-EXPOSE 8090
+EXPOSE 8090 8091
 
 ENTRYPOINT ["/usr/local/bin/alice-engine"]
