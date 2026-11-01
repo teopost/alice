@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111214">
+<title>Alice</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23e04040'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3Ea%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">alice</div>
+  <div class="preset">
+    <select id="presetSelect" title="Preset salvati"></select>
+    <input id="presetName" type="text" spellcheck="false" title="Nome del preset">
+    <button id="savePreset" class="btn">Salva</button>
+    <button id="newPreset" class="btn ghost" title="Nuovo preset vuoto">Nuovo</button>
+    <button id="deletePreset" class="btn ghost danger" title="Elimina il preset selezionato">Elimina</button>
+  </div>
+  <div class="meters">
+    <div class="meter" title="Carico DSP (JACK)">
+      <span class="meter-label">DSP</span>
+      <div class="meter-bar"><div id="dspFill"></div></div>
+      <span id="dspValue" class="meter-value">--</span>
+    </div>
+    <span id="engineInfo" class="engine-info"></span>
+    <span id="conn" class="conn" title="Connessione al motore"></span>
+  </div>
+</header>
+
+<main>
+  <section class="path-wrap">
+    <div id="path" class="path"></div>
+  </section>
+
+  <section id="editor" class="editor"></section>
+
+  <section class="testbar">
+    <span class="testbar-label">Prova suono</span>
+    <select id="diSelect" title="File DI (chitarra registrata senza effetti)"></select>
+    <label class="btn ghost">Carica DI<input id="diUpload" type="file" accept=".wav,audio/wav" hidden></label>
+    <button id="renderBtn" class="btn primary">▶ Ascolta</button>
+    <span id="renderInfo" class="hint"></span>
+    <audio id="player" controls></audio>
+  </section>
+</main>
+
+<div id="toast" class="toast"></div>
+<script src="app.js" type="module"></script>
+</body>
+</html>

@@ -6,3 +6,5 @@ data/renders/*
 !data/*/.gitkeep
 __pycache__/
 *.pyc
+data/state/*
+data/presets/*

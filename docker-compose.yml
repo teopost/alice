@@ -1,19 +1,24 @@
 # Sviluppo su PC (anche WSL2): JACK con driver "dummy", nessuna scheda audio.
+# Interfaccia web: http://localhost:8090
 # Su Linux nativo / Raspberry Pi usare anche docker-compose.hw.yml:
-#   docker compose -f docker-compose.yml -f docker-compose.hw.yml up
+#   docker compose -f docker-compose.yml -f docker-compose.hw.yml up -d
 services:
-  engine:
-    build: ./engine
-    image: alice-engine:dev
-    container_name: alice-engine
+  alice:
+    build:
+      context: .
+      dockerfile: engine/Dockerfile
+    image: alice:dev
+    container_name: alice
     environment:
       ALICE_AUDIO_DRIVER: dummy
       ALICE_SAMPLE_RATE: 48000
       ALICE_BUFFER_SIZE: 128
     ports:
-      - "5555:5555"
-      - "5556:5556"
+      - "8090:8090"
     volumes:
       - ./data:/data
+      # sviluppo: codice montato dal repository (riavviare il container dopo le modifiche)
+      - ./backend:/opt/alice/backend:ro
+      - ./web:/opt/alice/web:ro
       - ./scripts:/opt/alice/scripts:ro
     restart: unless-stopped

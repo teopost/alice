@@ -1,4 +1,5 @@
-# Alice engine: JACK + mod-host (LV2 host) + NAM LV2 + LV2 effects
+# Alice: JACK + mod-host (LV2 host) + NAM LV2 + effetti LV2 + backend web
+# Build dalla radice del repository: docker build -f engine/Dockerfile .
 # Multi-arch: amd64 (sviluppo/PC) e arm64 (Raspberry Pi 5)
 
 FROM debian:trixie-slim AS build
@@ -28,15 +29,22 @@ FROM debian:trixie-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         jackd2 jack-example-tools libjack-jackd2-0 liblilv-0-0 libreadline8t64 libfftw3-single3 libfftw3-double3 \
-        lilv-utils lsp-plugins-lv2 \
-        python3 python3-jack-client python3-soundfile python3-numpy \
+        lilv-utils lsp-plugins-lv2 guitarix-lv2 dragonfly-reverb-lv2 \
+        python3 python3-jack-client python3-soundfile python3-numpy python3-lilv \
+        python3-fastapi python3-uvicorn python3-websockets \
         sox procps netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /out/ /
 
-COPY entrypoint.sh /usr/local/bin/alice-engine
+# python3-lilv carica "liblilv-0.so", fornito solo dal pacchetto -dev
+RUN ln -s "$(find /usr/lib -name 'liblilv-0.so.0' | head -1)" "$(dirname "$(find /usr/lib -name 'liblilv-0.so.0' | head -1)")/liblilv-0.so"
+
+COPY engine/entrypoint.sh /usr/local/bin/alice-engine
 RUN chmod +x /usr/local/bin/alice-engine
+COPY backend /opt/alice/backend
+COPY web /opt/alice/web
+COPY scripts /opt/alice/scripts
 
 ENV LV2_PATH=/usr/lib/lv2 \
     ALICE_AUDIO_DRIVER=dummy \
@@ -45,9 +53,12 @@ ENV LV2_PATH=/usr/lib/lv2 \
     ALICE_BUFFER_SIZE=128 \
     ALICE_PERIODS=2 \
     MOD_HOST_PORT=5555 \
-    MOD_HOST_FEEDBACK_PORT=5556
+    MOD_HOST_FEEDBACK_PORT=5556 \
+    ALICE_HTTP_PORT=8090 \
+    ALICE_DATA=/data \
+    ALICE_WEB=/opt/alice/web
 
 VOLUME ["/data"]
-EXPOSE 5555 5556
+EXPOSE 8090
 
 ENTRYPOINT ["/usr/local/bin/alice-engine"]
