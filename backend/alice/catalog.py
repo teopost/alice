@@ -4,7 +4,7 @@ Ogni modello è un plugin LV2 con una selezione di parametri (come i pochi knob
 di un blocco Helix). Range, default ed enumerazioni vengono letti dai metadati
 LV2 con lilv, così il catalogo resta corto.
 
-Campi di un parametro: symbol, label opzionale, display opzionale:
+Campi di un parametro: symbol, label, default e display opzionali:
   "db"  -> il valore LV2 è un guadagno lineare, mostrato in dB
   "pct" -> valore 0..1 mostrato in percentuale
 """
@@ -37,7 +37,8 @@ FILE_KINDS = {
 MODELS = [
     # --- Dynamics
     {"id": "gate", "name": "Noise Gate", "category": "dynamics", "uri": L + "gate_mono",
-     "params": [{"symbol": "gt", "label": "Threshold", "display": "db"},
+     # soglia di default del plugin (-24 dB) troppo alta per una chitarra: chiude il segnale
+     "params": [{"symbol": "gt", "label": "Threshold", "display": "db", "default": 0.00316},
                 {"symbol": "gr", "label": "Reduction", "display": "db"},
                 {"symbol": "at", "label": "Attack"},
                 {"symbol": "rt", "label": "Release"}]},
@@ -168,6 +169,8 @@ def load_catalog():
                 log.warning("%s: parametro %s non trovato", m["id"], spec["symbol"])
                 continue
             d, mn, mx = (_num(x) for x in q.get_range())
+            if "default" in spec:  # default di Alice al posto di quello del plugin
+                d = float(spec["default"])
             par = {"symbol": spec["symbol"], "label": spec.get("label") or str(q.get_name()),
                    "min": mn, "max": mx, "default": d, "display": spec.get("display")}
             for k, uri in props.items():

@@ -50,6 +50,10 @@
       <option value="1024">Buffer 1024</option>
       <option value="2048">Buffer 2048</option>
     </select>
+    <label class="gain" title="Guadagno d'ingresso: alzalo se l'indicatore IN si muove poco">
+      Guadagno <input id="liveGain" type="range" min="0" max="36" step="1" value="0">
+      <span id="liveGainValue">+0 dB</span>
+    </label>
     <button id="liveBtn" class="btn primary">● Attiva</button>
     <div class="vu" title="Livello ingresso"><span>IN</span><div class="vu-bar"><div id="vuIn"></div></div></div>
     <div class="vu" title="Livello uscita"><span>OUT</span><div class="vu-bar"><div id="vuOut"></div></div></div>

@@ -6,6 +6,7 @@ class AliceBridge extends AudioWorkletProcessor {
   constructor() {
     super();
     this.channel = 0;
+    this.gain = 1;                // guadagno d'ingresso (lineare)
     this.target = 512;            // campioni da accumulare prima di riprodurre
     this.ring = new Float32Array(48000 * 2);
     this.r = 0;                   // contatori assoluti
@@ -21,6 +22,7 @@ class AliceBridge extends AudioWorkletProcessor {
       if (m.type === "config") {
         if (m.channel !== undefined) this.channel = m.channel;
         if (m.target !== undefined) this.target = m.target;
+        if (m.gain !== undefined) this.gain = m.gain;
       }
     };
   }
@@ -45,6 +47,7 @@ class AliceBridge extends AudioWorkletProcessor {
       const ch = input[Math.min(this.channel, input.length - 1)];
       const copy = new Float32Array(ch);
       for (let i = 0; i < copy.length; i++) {
+        copy[i] *= this.gain;
         const a = Math.abs(copy[i]);
         if (a > this.inPeak) this.inPeak = a;
       }

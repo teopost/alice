@@ -669,6 +669,15 @@ function setupLive() {
     $("#liveInfo").textContent = "Il browser permette l'ingresso audio solo da http://localhost o in https.";
     return;
   }
+  const gain = $("#liveGain");
+  const showGain = () => ($("#liveGainValue").textContent = `+${gain.value} dB`);
+  if (LS("liveGain") !== null) gain.value = LS("liveGain");
+  showGain();
+  gain.addEventListener("input", () => {
+    showGain();
+    LS("liveGain", gain.value);
+    live.node?.port.postMessage({ type: "config", gain: liveGain() });
+  });
   for (const id of ["liveInput", "liveOutput", "liveChannel", "liveBuffer"]) {
     const saved = LS(id);  // ingresso e uscita vengono ripristinati da listDevices()
     if (saved !== null && (id === "liveChannel" || id === "liveBuffer")) $("#" + id).value = saved;
@@ -687,6 +696,8 @@ function setupLive() {
   navigator.mediaDevices.addEventListener?.("devicechange", () => listDevices().catch(() => {}));
   $("#liveBtn").onclick = () => (live.ctx ? stopLive() : startLive());
 }
+
+const liveGain = () => Math.pow(10, Number($("#liveGain").value) / 20);
 
 async function startLive() {
   const btn = $("#liveBtn");
@@ -712,7 +723,7 @@ async function startLive() {
     });
     live.node = node;
     node.port.postMessage({ type: "config", channel: Number($("#liveChannel").value),
-                            target: Number($("#liveBuffer").value) });
+                            target: Number($("#liveBuffer").value), gain: liveGain() });
     ctx.createMediaStreamSource(live.stream).connect(node);
     node.connect(ctx.destination);
 
