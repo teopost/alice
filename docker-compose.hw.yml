@@ -1,0 +1,18 @@
+# Override per hardware reale (Linux nativo, Raspberry Pi): scheda audio + tempo reale.
+# Trova il device con `aplay -l` (es. hw:1 = seconda scheda).
+services:
+  engine:
+    environment:
+      ALICE_AUDIO_DRIVER: alsa
+      ALICE_ALSA_DEVICE: hw:1
+    devices:
+      - /dev/snd
+    group_add:
+      - audio
+    cap_add:
+      - SYS_NICE
+    ulimits:
+      rtprio: 95
+      memlock: -1
+    network_mode: host
+    ports: !reset []

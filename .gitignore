@@ -1,0 +1,8 @@
+# dati utente: modelli NAM, IR, file DI e render audio
+data/models/*
+data/irs/*
+data/di/*
+data/renders/*
+!data/*/.gitkeep
+__pycache__/
+*.pyc
